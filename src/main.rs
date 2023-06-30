@@ -29,5 +29,6 @@ fn main() -> ! {
     wdt1.disable();
     println!("Hello world!");
 
+    #[allow(clippy::empty_loop)]
     loop {}
 }
