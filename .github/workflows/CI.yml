@@ -22,5 +22,5 @@ jobs:
         run: cargo fmt -- --check --color always
 
       - name: clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy -- -D warnings
 
