@@ -16,7 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: esp-rs/xtensa-toolchain@v1.5
+        with:
+          ldproxy: false
+          buildtargets: esp32s3
+
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: check rustfmt
         run: cargo fmt -- --check --color always
