@@ -7,12 +7,12 @@ use keyberon::{action::k, debounce::Debouncer, layout::Layers};
 
 use KeyCode::*;
 static LAYOUT: Layers<3, 6, 1> = [[
-    [k(A), k(B), k(C)],
-    [k(D), k(E), k(F)],
-    [k(G), k(H), k(I)],
-    [k(J), k(K), k(L)],
-    [k(M), k(N), k(O)],
-    [k(P), k(Q), k(R)],
+    [k(Q), k(A), k(Z)],
+    [k(W), k(S), k(X)],
+    [k(E), k(D), k(C)],
+    [k(R), k(F), k(V)],
+    [k(T), k(G), k(B)],
+    [k(Y), k(Q), k(R)],
 ]];
 
 pub struct BoardLeftFinger<C: InputPin, R: OutputPin> {

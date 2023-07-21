@@ -9,6 +9,7 @@ use hal::{prelude::*, Delay};
 
 mod board_modules;
 use board_modules::left_finger;
+use keyberon::layout::Event;
 
 #[entry]
 fn main() -> ! {
@@ -38,15 +39,23 @@ fn main() -> ! {
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
 
-    let mut delay = Delay::new(&clocks);
     println!("Hello world!");
     for _ in 0.. {
         let events = board_left_finger
             .debouncer
             .events(board_left_finger.matrix.get().unwrap())
             .collect::<heapless::Vec<_, 8>>();
-        for (i, event) in events.iter().enumerate() {
-            println!("{:?}", event);
+        for event in events.iter() {
+            match event {
+                Event::Press(x, y) => println!(
+                    "P-{:?}",
+                    board_left_finger.layout[0][*x as usize][*y as usize]
+                ),
+                Event::Release(x, y) => println!(
+                    "R-{:?}",
+                    board_left_finger.layout[0][*x as usize][*y as usize]
+                ),
+            }
         }
     }
     unreachable!()
