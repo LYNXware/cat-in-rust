@@ -6,27 +6,29 @@ use keyberon::matrix::Matrix;
 use keyberon::{action::k, debounce::Debouncer, layout::Layers};
 
 use KeyCode::*;
-static LAYOUT: Layers<3, 6, 1> = [[
-    [k(Q), k(A), k(Z)],
-    [k(W), k(S), k(X)],
-    [k(E), k(D), k(C)],
-    [k(R), k(F), k(V)],
-    [k(T), k(G), k(B)],
-    [k(Y), k(Q), k(R)],
+#[rustfmt::skip]
+static LAYOUT: Layers<4, 6, 1> = [[
+    [k(No),     k(No), k(A), k(Z)],
+    [k(No),     k(Q), k(S), k(X)],
+    [k(Escape), k(W), k(D), k(C)],
+    [k(LCtrl),  k(E), k(F), k(V)],
+    [k(LAlt),   k(R), k(G), k(B)],
+    [k(No),     k(T), k(Q), k(R)],
 ]];
 
-/// Note: keyberon::matrix::Matrix assumes input is column, 
-/// while lynx-cat hardware has row as input. 
+/// Note: keyberon::matrix::Matrix assumes input is column,
+/// while lynx-cat hardware has row as input.
 pub struct BoardLeftFinger<C: InputPin, R: OutputPin> {
-    pub matrix: Matrix<C, R, 3, 6>,
-    pub debouncer: Debouncer<[[bool; 3]; 6]>,
-    pub layout: Layers<3, 6, 1>,
+    pub matrix: Matrix<C, R, 4, 6>,
+    pub debouncer: Debouncer<[[bool; 4]; 6]>,
+    pub layout: Layers<4, 6, 1>,
 }
 
 impl BoardLeftFinger<AnyPin<Input<PullUp>>, AnyPin<Output<PushPull>>> {
     pub fn new(pins: Pins) -> Self {
         let matrix = Matrix::new(
             [
+                pins.gpio21.into_pull_up_input().degrade(),
                 pins.gpio47.into_pull_up_input().degrade(),
                 pins.gpio48.into_pull_up_input().degrade(),
                 pins.gpio45.into_pull_up_input().degrade(),
@@ -42,7 +44,7 @@ impl BoardLeftFinger<AnyPin<Input<PullUp>>, AnyPin<Output<PushPull>>> {
             ],
         )
         .unwrap();
-        let debounce = || [[false; 3]; 6];
+        let debounce = || [[false; 4]; 6];
 
         Self {
             matrix,
