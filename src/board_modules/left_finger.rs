@@ -15,6 +15,8 @@ static LAYOUT: Layers<3, 6, 1> = [[
     [k(Y), k(Q), k(R)],
 ]];
 
+/// Note: keyberon::matrix::Matrix assumes input is column, 
+/// while lynx-cat hardware has row as input. 
 pub struct BoardLeftFinger<C: InputPin, R: OutputPin> {
     pub matrix: Matrix<C, R, 3, 6>,
     pub debouncer: Debouncer<[[bool; 3]; 6]>,
@@ -22,11 +24,6 @@ pub struct BoardLeftFinger<C: InputPin, R: OutputPin> {
 }
 
 impl BoardLeftFinger<AnyPin<Input<PullUp>>, AnyPin<Output<PushPull>>> {
-    /// The consumed IO is returned
-    /// ```ignore
-    /// let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    /// let (board_left_finger, io) = left_finger::BoardLeftFinger::new(io);
-    /// ```
     pub fn new(pins: Pins) -> Self {
         let matrix = Matrix::new(
             [

@@ -13,6 +13,7 @@ use keyberon::layout::Event;
 
 #[entry]
 fn main() -> ! {
+    // Obtain board resources
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -34,12 +35,13 @@ fn main() -> ! {
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
-    println!("Hello world!");
 
+    // Setup the board-left-finger module
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
 
-    println!("Hello world!");
+    // Demonstrate PoC using keyberon to read the matrix
+    println!("Begin reading keyboard");
     for _ in 0.. {
         let events = board_left_finger
             .debouncer
