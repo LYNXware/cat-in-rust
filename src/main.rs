@@ -41,11 +41,13 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
     println!("Hello world!");
     for _ in 0.. {
-        // let events = board_left_finger.debouncer.get().events(board_left_finger.matrix.get().unwrap().iter_pressed()).collect::<heapless::Vec<_, 8>>();
-        // for (i, event) in events.iter().enumerate() {
-        //     println!("{}", i);
-        // }
-        delay.delay_ms(500u16);
+        let events = board_left_finger
+            .debouncer
+            .events(board_left_finger.matrix.get().unwrap())
+            .collect::<heapless::Vec<_, 8>>();
+        for (i, event) in events.iter().enumerate() {
+            println!("{:?}", event);
+        }
     }
     unreachable!()
 }
