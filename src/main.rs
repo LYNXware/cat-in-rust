@@ -4,8 +4,8 @@
 
 use esp_backtrace as _;
 use esp_println::println;
-use hal::prelude::*;
 use hal::{clock::ClockControl, peripherals::Peripherals, timer::TimerGroup, Rtc, IO};
+use hal::{prelude::*, Delay};
 
 mod board_modules;
 use board_modules::left_finger;
@@ -36,8 +36,15 @@ fn main() -> ! {
     println!("Hello world!");
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let (board_left_finger, io) = left_finger::BoardLeftFinger::new(io);
+    let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
 
-    #[allow(clippy::empty_loop)]
-    loop {}
+    let mut delay = Delay::new(&clocks);
+    println!("Hello world!");
+    for _ in 0.. {
+        for _ in board_left_finger.matrix.get().unwrap().iter_pressed() {
+            println!("key");
+        }
+        delay.delay_ms(500u16);
+    }
+    unreachable!()
 }
