@@ -4,8 +4,8 @@
 
 use esp_backtrace as _;
 use esp_println::println;
+use hal::prelude::*;
 use hal::{clock::ClockControl, peripherals::Peripherals, timer::TimerGroup, Rtc, IO};
-use hal::{prelude::*, Delay};
 
 mod board_modules;
 use board_modules::left_finger;

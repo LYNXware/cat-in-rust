@@ -6,18 +6,16 @@ use keyberon::matrix::Matrix;
 use keyberon::{action::k, debounce::Debouncer, layout::Layers};
 
 use KeyCode::*;
-#[rustfmt::skip]
-static LAYOUT: Layers<4, 6, 1> = [[
-    [k(No),     k(No), k(A), k(Z)],
-    [k(No),     k(Q), k(S), k(X)],
-    [k(Escape), k(W), k(D), k(C)],
-    [k(LCtrl),  k(E), k(F), k(V)],
-    [k(LAlt),   k(R), k(G), k(B)],
-    [k(No),     k(T), k(Q), k(R)],
-]];
 
-/// Note: keyberon::matrix::Matrix assumes input is column,
-/// while lynx-cat hardware has row as input.
+#[rustfmt::skip]
+static LAYOUT: Layers<4, 6, 1> = [transpose::transpose!{[
+    [k(No), k(No), k(Escape), k(LCtrl), k(LAlt), k(No)],
+    [k(No), k(Q),  k(W),      k(E),     k(R),    k(T)],
+    [k(A),  k(S),  k(D),      k(F),     k(G),    k(Q)],
+    [k(Z),  k(X),  k(C),      k(V),     k(B),    k(R)],
+]}];
+
+/// 4 rows, 6 columns per row, just the one layer
 pub struct BoardLeftFinger<C: InputPin, R: OutputPin> {
     pub matrix: Matrix<C, R, 4, 6>,
     pub debouncer: Debouncer<[[bool; 4]; 6]>,
