@@ -359,8 +359,8 @@ dependencies = [
 
 [[package]]
 name = "keyberon"
-version = "0.2.0"
-source = "git+https://github.com/Ben-PH/keyberon#24bd53f850bb5f07b1eee36fe3ac75082d439c10"
+version = "0.3.0"
+source = "git+https://github.com/Ben-PH/keyberon#315165510f3605d67bc66ed19626b56e86668d4c"
 dependencies = [
  "arraydeque",
  "either",
@@ -373,7 +373,7 @@ dependencies = [
 [[package]]
 name = "keyberon-macros"
 version = "0.1.0"
-source = "git+https://github.com/Ben-PH/keyberon#24bd53f850bb5f07b1eee36fe3ac75082d439c10"
+source = "git+https://github.com/Ben-PH/keyberon#315165510f3605d67bc66ed19626b56e86668d4c"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",

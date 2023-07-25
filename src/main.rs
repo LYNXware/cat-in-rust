@@ -45,7 +45,7 @@ fn main() -> ! {
     for _ in 0.. {
         let events = board_left_finger
             .debouncer
-            .events(board_left_finger.matrix.get().unwrap())
+            .events(board_left_finger.matrix.down_keys().unwrap(), Some(keyberon::debounce::transpose))
             .collect::<heapless::Vec<_, 8>>();
         for event in events.iter() {
             match event {
