@@ -40,7 +40,10 @@ fn main() -> ! {
 
         IO::new(peripherals.GPIO, peripherals.IO_MUX)
     };
+    main_loop(io)
+}
 
+fn main_loop(io: IO) -> ! {
     // Setup the board-left-finger module
     let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
 
