@@ -3,7 +3,7 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_println::println;
+use esp_println::{logger::init_logger, println };
 use hal::prelude::*;
 use hal::{clock::ClockControl, peripherals::Peripherals, timer::TimerGroup, Rtc, IO};
 
@@ -13,6 +13,7 @@ use keyberon::layout::Event;
 
 #[entry]
 fn main() -> ! {
+    init_logger(log::LevelFilter::Debug);
     // Obtain board resources
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
@@ -41,7 +42,7 @@ fn main() -> ! {
     let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
 
     // Demonstrate PoC using keyberon to read the matrix
-    println!("Begin reading keyboard");
+    log::info!("Begin reading keyboard");
     for _ in 0.. {
         let events = board_left_finger
             .debouncer
@@ -52,11 +53,11 @@ fn main() -> ! {
             .collect::<heapless::Vec<_, 8>>();
         for event in events.iter() {
             match event {
-                Event::Press(x, y) => println!(
+                Event::Press(x, y) => log::info!(
                     "P-{:?}",
                     board_left_finger.layout[0][*x as usize][*y as usize]
                 ),
-                Event::Release(x, y) => println!(
+                Event::Release(x, y) => log::info!(
                     "R-{:?}",
                     board_left_finger.layout[0][*x as usize][*y as usize]
                 ),
