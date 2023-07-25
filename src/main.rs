@@ -3,40 +3,39 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_println::{logger::init_logger, println };
+use esp_println::{logger::init_logger, println};
+use hal::clock::Clocks;
 use hal::prelude::*;
+use hal::system::SystemParts;
+use hal::timer::Wdt;
 use hal::{clock::ClockControl, peripherals::Peripherals, timer::TimerGroup, Rtc, IO};
 
 mod board_modules;
 use board_modules::left_finger;
 use keyberon::layout::Event;
 
+struct InitItems {
+    peripherals: Peripherals,
+    split_parts: SystemParts,
+    clocks: Clocks,
+    rtc: Rtc,
+    timer_group0: TimerGroup,
+    wdt0: Wdt,
+    timer_group1: TimerGroup,
+    wdt1: Wdt,
+}
 #[entry]
 fn main() -> ! {
-    init_logger(log::LevelFilter::Debug);
-    // Obtain board resources
-    let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-
-    // Disable the RTC and TIMG watchdog timers
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
-
+    let InitItems {
+        peripherals,
+        split_parts,
+        clocks,
+        rtc,
+        timer_group0,
+        wdt0,
+        timer_group1,
+        wdt1,
+    } = init();
     // Setup the board-left-finger module
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
@@ -65,4 +64,39 @@ fn main() -> ! {
         }
     }
     unreachable!()
+}
+fn init() -> InitItems {
+    init_logger(log::LevelFilter::Debug);
+    // Obtain board resources
+    let peripherals = Peripherals::take();
+    let mut system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+
+    // Disable the RTC and TIMG watchdog timers
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
+    let mut wdt1 = timer_group1.wdt;
+    rtc.rwdt.disable();
+    wdt0.disable();
+    wdt1.disable();
+    InitItems {
+        peripherals,
+        split_parts: system,
+        clocks,
+        rtc,
+        timer_group0,
+        wdt0,
+        timer_group1,
+        wdt1,
+    }
 }
