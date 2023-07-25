@@ -7,9 +7,10 @@ use esp_println::logger::init_logger;
 use hal::prelude::*;
 use hal::{clock::ClockControl, peripherals::Peripherals, timer::TimerGroup, Rtc, IO};
 
+use keyberon::layout::Event;
+
 mod board_modules;
 use board_modules::left_finger;
-use keyberon::layout::Event;
 
 #[entry]
 fn main() -> ! {
