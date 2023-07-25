@@ -1,11 +1,19 @@
+#![warn(unused_imports)]
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_println::println;
-use hal::{clock::ClockControl, peripherals::Peripherals, prelude::*, timer::TimerGroup, Rtc};
+use hal::prelude::*;
+use hal::{clock::ClockControl, peripherals::Peripherals, timer::TimerGroup, Rtc, IO};
+
+mod board_modules;
+use board_modules::left_finger;
+use keyberon::layout::Event;
+
 #[entry]
 fn main() -> ! {
+    // Obtain board resources
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -27,8 +35,33 @@ fn main() -> ! {
     rtc.rwdt.disable();
     wdt0.disable();
     wdt1.disable();
-    println!("Hello world!");
 
-    #[allow(clippy::empty_loop)]
-    loop {}
+    // Setup the board-left-finger module
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
+
+    // Demonstrate PoC using keyberon to read the matrix
+    println!("Begin reading keyboard");
+    for _ in 0.. {
+        let events = board_left_finger
+            .debouncer
+            .events(
+                board_left_finger.matrix.down_keys().unwrap(),
+                Some(keyberon::debounce::transpose),
+            )
+            .collect::<heapless::Vec<_, 8>>();
+        for event in events.iter() {
+            match event {
+                Event::Press(x, y) => println!(
+                    "P-{:?}",
+                    board_left_finger.layout[0][*x as usize][*y as usize]
+                ),
+                Event::Release(x, y) => println!(
+                    "R-{:?}",
+                    board_left_finger.layout[0][*x as usize][*y as usize]
+                ),
+            }
+        }
+    }
+    unreachable!()
 }
