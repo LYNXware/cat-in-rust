@@ -13,32 +13,35 @@ use keyberon::layout::Event;
 
 #[entry]
 fn main() -> ! {
-    init_logger(log::LevelFilter::Debug);
-    // Obtain board resources
-    let peripherals = Peripherals::take();
-    let mut system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let io = {
+        init_logger(log::LevelFilter::Debug);
+        // Obtain board resources
+        let peripherals = Peripherals::take();
+        let mut system = peripherals.SYSTEM.split();
+        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-    // Disable the RTC and TIMG watchdog timers
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    let mut wdt1 = timer_group1.wdt;
-    rtc.rwdt.disable();
-    wdt0.disable();
-    wdt1.disable();
+        // Disable the RTC and TIMG watchdog timers
+        let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+        let timer_group0 = TimerGroup::new(
+            peripherals.TIMG0,
+            &clocks,
+            &mut system.peripheral_clock_control,
+        );
+        let mut wdt0 = timer_group0.wdt;
+        let timer_group1 = TimerGroup::new(
+            peripherals.TIMG1,
+            &clocks,
+            &mut system.peripheral_clock_control,
+        );
+        let mut wdt1 = timer_group1.wdt;
+        rtc.rwdt.disable();
+        wdt0.disable();
+        wdt1.disable();
+
+        IO::new(peripherals.GPIO, peripherals.IO_MUX)
+    };
 
     // Setup the board-left-finger module
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
 
     // Demonstrate PoC using keyberon to read the matrix
