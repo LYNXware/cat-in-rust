@@ -6,7 +6,6 @@ use keyberon::key_code::KeyCode;
 use keyberon::matrix::Matrix;
 use keyberon::{action::k, debounce::Debouncer, layout::Layers};
 
-
 #[rustfmt::skip]
 static LAYOUT: Layers<6, 4, 1> = {
 #[allow(clippy::enum_glob_use)]
@@ -49,9 +48,16 @@ impl BoardLeftFinger<AnyPin<Input<PullUp>>, AnyPin<Output<PushPull>>> {
         .unwrap();
         let debounce = || [[false; 4]; 6];
 
+        let debouncer = Debouncer::new(debounce(), debounce(), 50);
+        log::trace!("debounce: 50");
+        log::trace!("matrix created: pull-up input:    [21, 47,48, 45]");
+        log::trace!("matrix created: push-pull-output: [37, 38, 39, 40, 41, 42]");
+
+        log::trace!("layout: \n {:?}", LAYOUT);
+
         Self {
             matrix,
-            debouncer: Debouncer::new(debounce(), debounce(), 50),
+            debouncer,
             layout: LAYOUT,
         }
     }
