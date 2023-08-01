@@ -14,5 +14,3 @@ use KeyCode::*;
     [k(Z),  k(X),  k(C),      k(V),     k(B),    k(R)],
 ]] 
 };
-
-

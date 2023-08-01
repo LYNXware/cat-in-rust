@@ -120,8 +120,10 @@ fn main() -> ! {
     let mut debouncer = keyberon::debounce::Debouncer::new([[false; 4]; 6], [[false; 4]; 6], 2);
     let mut layout = Layout::new(&board_modules::left_finger::LAYERS);
     loop {
-
-        let events = debouncer.events(key_scan(&mut delay, ins, outs), Some(keyberon::debounce::transpose));
+        let events = debouncer.events(
+            key_scan(&mut delay, ins, outs),
+            Some(keyberon::debounce::transpose),
+        );
         for event in events {
             layout.event(event);
         }
