@@ -14,50 +14,44 @@ use board_modules::left_finger;
 
 #[entry]
 fn main() -> ! {
-    let io = {
-        init_logger(log::LevelFilter::Trace);
-        log::trace!("entered main, logging initialized");
-        // Obtain board resources
-        let peripherals = Peripherals::take();
-        log::trace!("Peripherals claimed");
-        let mut system = peripherals.SYSTEM.split();
-        log::trace!("System components claimed");
-        let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-        log::trace!("clocks claimed with boot-defaultes, and frozen");
+    init_logger(log::LevelFilter::Trace);
+    log::trace!("entered main, logging initialized");
+    // Obtain board resources
+    let peripherals = Peripherals::take();
+    log::trace!("Peripherals claimed");
+    let mut system = peripherals.SYSTEM.split();
+    log::trace!("System components claimed");
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    log::trace!("clocks claimed with boot-defaultes, and frozen");
 
-        // Disable the RTC and TIMG watchdog timers
-        let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-        log::trace!("Rtc claimed");
-        let timer_group0 = TimerGroup::new(
-            peripherals.TIMG0,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        );
-        log::trace!("TimerGroup0 created");
-        let mut wdt0 = timer_group0.wdt;
-        let timer_group1 = TimerGroup::new(
-            peripherals.TIMG1,
-            &clocks,
-            &mut system.peripheral_clock_control,
-        );
-        log::trace!("TimerGroup1 created");
-        let mut wdt1 = timer_group1.wdt;
-        log::trace!("Disabling timers:");
-        rtc.rwdt.disable();
+    // Disable the RTC and TIMG watchdog timers
+    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
+    log::trace!("Rtc claimed");
+    let timer_group0 = TimerGroup::new(
+        peripherals.TIMG0,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
+    log::trace!("TimerGroup0 created");
+    let mut wdt0 = timer_group0.wdt;
+    let timer_group1 = TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    );
+    log::trace!("TimerGroup1 created");
+    let mut wdt1 = timer_group1.wdt;
+    log::trace!("Disabling timers:");
+    rtc.rwdt.disable();
 
-        log::trace!("\t rtc.rwdt.disable()");
-        wdt0.disable();
-        log::trace!("\t wdt0.disable()");
-        wdt1.disable();
-        log::trace!("\t wdt1.disable()");
+    log::trace!("\t rtc.rwdt.disable()");
+    wdt0.disable();
+    log::trace!("\t wdt0.disable()");
+    wdt1.disable();
+    log::trace!("\t wdt1.disable()");
 
-        IO::new(peripherals.GPIO, peripherals.IO_MUX)
-    };
+    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     log::trace!("gpio created");
-    main_loop(io)
-}
-
-fn main_loop(io: IO) -> ! {
     // Setup the board-left-finger module
     let mut board_left_finger = left_finger::BoardLeftFinger::new(io.pins);
 
