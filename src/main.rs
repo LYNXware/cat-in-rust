@@ -2,18 +2,14 @@
 #![no_std]
 #![no_main]
 
-use core::cell::RefCell;
 use core::convert::Infallible;
 
-use critical_section::Mutex;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
-use hal::gpio::Unknown;
 use hal::otg_fs::{UsbBus, USB};
 use hal::{
     clock::ClockControl,
-    gpio::{Gpio18, Gpio19, Gpio20},
     peripherals::Peripherals,
     timer::TimerGroup,
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
@@ -21,8 +17,7 @@ use hal::{
 };
 use hal::{prelude::*, Delay};
 use keyberon::{key_code::KbHidReport, layout::Layout};
-use usb_device::class_prelude::UsbBusAllocator;
-use usb_device::prelude::{UsbDevice, UsbDeviceBuilder, UsbVidPid};
+use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 use usbd_hid::{
     descriptor::{KeyboardReport, SerializedDescriptor},
     hid_class::HIDClass,
@@ -31,29 +26,18 @@ use usbd_hid::{
 mod board_modules;
 
 static mut USB_MEM: [u32; 1024] = [0; 1024];
-static mut USB_BUS: Option<
-    UsbBusAllocator<UsbBus<USB<Gpio18<Unknown>, Gpio19<Unknown>, Gpio20<Unknown>>>>,
-> = None;
-static mut USB_HID: Option<
-    HIDClass<UsbBus<USB<Gpio18<Unknown>, Gpio19<Unknown>, Gpio20<Unknown>>>>,
-> = None;
-static mut USB_DEV: Option<
-    UsbDevice<UsbBus<USB<Gpio18<Unknown>, Gpio19<Unknown>, Gpio20<Unknown>>>>,
-> = None;
-
-static KB_REPORT: Mutex<RefCell<Option<KbHidReport>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
-    init_logger(log::LevelFilter::Trace);
+    init_logger(log::LevelFilter::Debug);
     log::trace!("entered main, logging initialized");
-    // Obtain board resources
     let peripherals = Peripherals::take();
     log::trace!("Peripherals claimed");
     let mut system = peripherals.SYSTEM.split();
     log::trace!("System components claimed");
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     log::trace!("clocks claimed with boot-defaultes, and frozen");
+    log::info!("Board resources claimed: peripherals, system, clocks");
 
     // Disable the RTC and TIMG watchdog timers
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
@@ -72,7 +56,6 @@ fn main() -> ! {
     );
     log::trace!("TimerGroup1 created");
     let mut wdt1 = timer_group1.wdt;
-    log::trace!("Disabling timers:");
     rtc.rwdt.disable();
 
     log::trace!("\t rtc.rwdt.disable()");
@@ -80,14 +63,15 @@ fn main() -> ! {
     log::trace!("\t wdt0.disable()");
     wdt1.disable();
     log::trace!("\t wdt1.disable()");
+    log::info!("clocks configured: rtc-wdt, wdt0/1 disabled");
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let uart_vdd_pin = io.pins.gpio1;
     let mut uart_vdd_pin = uart_vdd_pin.into_push_pull_output();
     uart_vdd_pin.set_high().unwrap();
 
-    let t_r_pins = UartTxRx::new_tx_rx(io.pins.gpio5, io.pins.gpio6);
-    // will log in the background. don't need to invoke directly
+    let t_r_pins = UartTxRx::new_tx_rx(io.pins.gpio44, io.pins.gpio43);
+    // will log in the background. Don't need to use directly
     let mut _uart = Uart::new_with_config(
         peripherals.UART0,
         Some(UartConfig::default()),
@@ -95,8 +79,8 @@ fn main() -> ! {
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    log::info!("uart-setup");
-    let mut delay = Delay::new(&clocks);
+
+    log::info!("uart-setup: gnd: gnd, tx: 44, rx: 43, pwr: 1");
 
     let usb = USB::new(
         peripherals.USB0,
@@ -106,24 +90,14 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
 
-    // Normally, would set up Mutex<RefCell<Option<...>>>, but these are all
-    // being accessed from within an interupt context (USB_DEVICE), which hasn't been activated yet
-    unsafe {
-        USB_BUS = Some(UsbBus::new(usb, &mut USB_MEM));
-        USB_HID = Some(HIDClass::new(
-            USB_BUS.as_ref().unwrap(),
-            KeyboardReport::desc(),
-            1,
-        ));
+    let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
+    let mut usb_hid = HIDClass::new(&usb_bus, KeyboardReport::desc(), 1);
 
-        USB_DEV = Some(
-            UsbDeviceBuilder::new(USB_BUS.as_ref().unwrap(), UsbVidPid(0, 0))
-                .manufacturer("shady-bastard")
-                .product("totally not a malicious thing")
-                .device_class(3)
-                .build(),
-        );
-    };
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
+        .manufacturer("shady-bastard")
+        .product("totally not a malicious thing")
+        .device_class(3)
+        .build();
 
     let ins: &[&dyn InputPin<Error = Infallible>; 4] = &[
         &io.pins.gpio21.into_pull_up_input(),
@@ -132,7 +106,6 @@ fn main() -> ! {
         &io.pins.gpio45.into_pull_up_input(),
     ];
     let outs: &mut [&mut dyn OutputPin<Error = Infallible>; 6] = &mut [
-        // pins.gpio21.into_push_pull_output(),
         &mut io.pins.gpio37.into_push_pull_output(),
         &mut io.pins.gpio38.into_push_pull_output(),
         &mut io.pins.gpio39.into_push_pull_output(),
@@ -143,27 +116,30 @@ fn main() -> ! {
     for out in outs.iter_mut() {
         out.set_high().unwrap();
     }
-    let mut debouncer = keyberon::debounce::Debouncer::new([[false; 4]; 6], [[false; 4]; 6], 2);
+    let mut debouncer = keyberon::debounce::Debouncer::new([[false; 4]; 6], [[false; 4]; 6], 5);
     let mut layout = Layout::new(&board_modules::left_finger::LAYERS);
-    critical_section::with(|cs| {
-        KB_REPORT.borrow_ref_mut(cs).replace(KbHidReport::default());
-    });
-    hal::interrupt::enable(
-        hal::soc::peripherals::Interrupt::USB_DEVICE,
-        hal::Priority::Priority2,
-    ).unwrap();
+
+    let mut delay = Delay::new(&clocks);
     loop {
-        let events = debouncer.events(
-            key_scan(&mut delay, ins, outs),
-            Some(keyberon::debounce::transpose),
-        );
-        for event in events {
-            layout.event(event);
+        delay.delay_ms(1u32);
+        let report = key_scan(&mut delay, ins, outs);
+        let events = debouncer.events(report, Some(keyberon::debounce::transpose));
+        for ev in events {
+            layout.event(ev);
         }
+        layout.tick();
         let report = layout.keycodes().collect::<KbHidReport>();
-        critical_section::with(|cs| {
-            KB_REPORT.borrow_ref_mut(cs).replace(report);
-        });
+        let bytes = report.as_bytes();
+        if bytes.iter().any(|&b| b != 0) {
+            log::debug!("{:?}", report);
+        }
+        if !usb_dev.poll(&mut [&mut usb_hid]) {
+            continue;
+        }
+        let res = usb_hid.push_raw_input(bytes);
+        if res.is_err() {
+            log::debug!("{:?}", res);
+        }
     }
 }
 
@@ -182,17 +158,4 @@ fn key_scan<const IN_N: usize, const OUT_N: usize>(
         let _todo_logerr = out_pin.set_high();
     }
     res
-}
-
-#[interrupt]
-unsafe fn USB_DEVICE() {
-    let dev_ref = USB_DEV.as_mut().unwrap();
-    let hid_ref = USB_HID.as_mut().unwrap();
-
-    if dev_ref.poll(&mut [hid_ref]) {
-        usb_device::class_prelude::UsbClass::poll(hid_ref);
-    }
-    let _ = critical_section::with(|cs| {
-        hid_ref.push_raw_input(KB_REPORT.borrow_ref(cs).as_ref().unwrap().as_bytes())
-    });
 }
