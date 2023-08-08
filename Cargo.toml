@@ -6,15 +6,33 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-hal = { package = "esp32s3-hal", version = "0.9.0" }
+hal = { package = "esp32s3-hal", version = "0.10.0" }
 esp-backtrace = { version = "0.7.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
-esp-println       = { version = "0.5.0", features = ["esp32s3", "log"] }
+esp-println = { version = "0.5.0", features = ["esp32s3", "log"] }
 keyberon = {git = "https://github.com/Ben-PH/keyberon"}
 critical-section = "1.1.1"
 embedded-hal = "0.2.7"
 generic-array = "0.14.7"
 heapless = "0.7.16"
 transpose = {git = "https://github.com/Ben-PH/transpose"}
-log = "0.4.19"
+log = "=0.4.18"
 usbd-hid = "0.6.1"
 usb-device = "0.2.9"
+
+[profile.dev.package.esp-wifi]
+opt-level = 3
+
+[profile.dev]
+lto = "off"
+[profile.release]
+lto = "off"
+
+[dependencies.esp-wifi]
+git = "https://github.com/esp-rs/esp-wifi.git"
+
+# In active development. Is often a good idea to lock it to a specific commit
+rev = "c7ca849274cf3d7a08b49c260bb46693c91c85c0"
+
+# A supported chip needs to be specified. 
+features = ["esp32s3",  "esp-now", "phy-enable-usb"]
+

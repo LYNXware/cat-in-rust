@@ -7,6 +7,9 @@ use core::convert::Infallible;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
+use esp_wifi::esp_now::{PeerInfo, ReceivedData};
+use esp_wifi::{initialize, EspWifiInitFor};
+use hal::clock::CpuClock;
 use hal::otg_fs::{UsbBus, USB};
 use hal::{
     clock::ClockControl,
@@ -15,7 +18,7 @@ use hal::{
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
     Rtc, IO,
 };
-use hal::{prelude::*, Delay};
+use hal::{prelude::*, Delay, Rng};
 use keyberon::{key_code::KbHidReport, layout::Layout};
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 use usbd_hid::{
@@ -26,44 +29,37 @@ use usbd_hid::{
 mod board_modules;
 
 static mut USB_MEM: [u32; 1024] = [0; 1024];
+// TODO: set primary and secondary as config parameters
+static PRIMARY_ADDR: [u8; 6] = [0x7c, 0xdf, 0xa1, 0xf4, 0x67, 0x38];
+static SECONDARY_ADDR: [u8; 6] = [0x7c, 0xdf, 0xa1, 0xf5, 0x64, 0xb4];
+// TODO: setup some sort of way to manage this in a sane way. This is honestly disgusting.
+static IS_PRIMARY: bool = true;
 
 #[entry]
 fn main() -> ! {
-    init_logger(log::LevelFilter::Debug);
-    log::trace!("entered main, logging initialized");
+    // panic!();
+    init_logger(log::LevelFilter::Info);
     let peripherals = Peripherals::take();
-    log::trace!("Peripherals claimed");
-    let mut system = peripherals.SYSTEM.split();
-    log::trace!("System components claimed");
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    log::trace!("clocks claimed with boot-defaultes, and frozen");
-    log::info!("Board resources claimed: peripherals, system, clocks");
 
-    // Disable the RTC and TIMG watchdog timers
+    let mut system = peripherals.SYSTEM.split();
+    let clocks = ClockControl::configure(system.clock_control, CpuClock::Clock240MHz).freeze();
     let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    log::trace!("Rtc claimed");
-    let timer_group0 = TimerGroup::new(
+    rtc.rwdt.disable();
+
+    TimerGroup::new(
         peripherals.TIMG0,
         &clocks,
         &mut system.peripheral_clock_control,
-    );
-    log::trace!("TimerGroup0 created");
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
+    )
+    .wdt
+    .disable();
+    let mut timer = TimerGroup::new(
         peripherals.TIMG1,
         &clocks,
         &mut system.peripheral_clock_control,
     );
-    log::trace!("TimerGroup1 created");
-    let mut wdt1 = timer_group1.wdt;
-    rtc.rwdt.disable();
-
-    log::trace!("\t rtc.rwdt.disable()");
-    wdt0.disable();
-    log::trace!("\t wdt0.disable()");
-    wdt1.disable();
-    log::trace!("\t wdt1.disable()");
-    log::info!("clocks configured: rtc-wdt, wdt0/1 disabled");
+    timer.wdt.disable();
+    let timer = timer.timer0;
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let uart_vdd_pin = io.pins.gpio1;
@@ -71,7 +67,7 @@ fn main() -> ! {
     uart_vdd_pin.set_high().unwrap();
 
     let t_r_pins = UartTxRx::new_tx_rx(io.pins.gpio44, io.pins.gpio43);
-    // will log in the background. Don't need to use directly
+    // // will log in the background. Don't need to use directly
     let mut _uart = Uart::new_with_config(
         peripherals.UART0,
         Some(UartConfig::default()),
@@ -79,8 +75,30 @@ fn main() -> ! {
         &clocks,
         &mut system.peripheral_clock_control,
     );
-
     log::info!("uart-setup: gnd: gnd, tx: 44, rx: 43, pwr: 1");
+
+    let init = initialize(
+        EspWifiInitFor::Wifi,
+        timer,
+        Rng::new(peripherals.RNG),
+        system.radio_clock_control,
+        &clocks,
+    )
+    .unwrap();
+    log::info!("esp-init");
+
+    let wifi = peripherals.RADIO.split().0;
+    let mut esp_now = match esp_wifi::esp_now::EspNow::new(&init, wifi) {
+        Ok(esp) => {
+            log::info!("esp-made");
+            esp
+        }
+        Err(e) => {
+            log::error!("esp-creation error: {:?}", e);
+            panic!();
+        }
+    };
+    log::info!("esp-now version {}", esp_now.get_version().unwrap());
 
     let usb = USB::new(
         peripherals.USB0,
@@ -89,15 +107,19 @@ fn main() -> ! {
         io.pins.gpio20,
         &mut system.peripheral_clock_control,
     );
+    log::info!("usb made");
 
     let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
+    log::info!("usb bus made");
     let mut usb_hid = HIDClass::new(&usb_bus, KeyboardReport::desc(), 1);
+    log::info!("usb class made");
 
     let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
         .manufacturer("shady-bastard")
         .product("totally not a malicious thing")
         .device_class(3)
         .build();
+    log::info!("usb dev built");
 
     let ins: &[&dyn InputPin<Error = Infallible>; 4] = &[
         &io.pins.gpio21.into_pull_up_input(),
@@ -120,25 +142,79 @@ fn main() -> ! {
     let mut layout = Layout::new(&board_modules::left_finger::LAYERS);
 
     let mut delay = Delay::new(&clocks);
+    // TODO: clean this up (where is the vomit emoji when you need it...)
+    if IS_PRIMARY {
+        log::info!("adding secondary");
+        let peer_add = esp_now.add_peer(PeerInfo {
+            peer_address: SECONDARY_ADDR,
+            lmk: None,
+            channel: None,
+            encrypt: false,
+        });
+        if peer_add.is_err() {
+            log::error!("error adding secondary peer");
+        } else {
+            log::info!("added peer");
+        }
+    } else if esp_now
+        .add_peer(PeerInfo {
+            peer_address: PRIMARY_ADDR,
+            lmk: None,
+            channel: None,
+            encrypt: false,
+        })
+        .is_err()
+    {
+        log::error!("bad pairing to primary");
+    }
+
     loop {
-        delay.delay_ms(1u32);
-        let report = key_scan(&mut delay, ins, outs);
-        let events = debouncer.events(report, Some(keyberon::debounce::transpose));
-        for ev in events {
-            layout.event(ev);
-        }
-        layout.tick();
-        let report = layout.keycodes().collect::<KbHidReport>();
-        let bytes = report.as_bytes();
-        if bytes.iter().any(|&b| b != 0) {
-            log::debug!("{:?}", report);
-        }
-        if !usb_dev.poll(&mut [&mut usb_hid]) {
-            continue;
-        }
-        let res = usb_hid.push_raw_input(bytes);
-        if res.is_err() {
-            log::debug!("{:?}", res);
+        // TODO: clean this up (where is the vomit emoji when you need it...)
+        if IS_PRIMARY {
+            if !usb_dev.poll(&mut [&mut usb_hid]) {
+                continue;
+            }
+            let r = esp_now.receive();
+            if let Some(ReceivedData {
+                len: _len,
+                data,
+                info: _info,
+            }) = r
+            {
+                // todo: perform data-fusion in-house once we start working with multiple
+                // switch-boards
+                let data = &data[0..8];
+                if data.iter().any(|&d| d != 0) {
+                    log::info!("{:?}", data);
+                }
+                if let Err(e) = usb_hid.push_raw_input(data) {
+                    // TODO: understand why pushing nil-state is a bad push.
+                    log::error!("{:?}", e);
+                    // match e {
+                    //     usb_device::UsbError::WouldBlock => todo!(),
+                    //     usb_device::UsbError::ParseError => todo!(),
+                    //     usb_device::UsbError::BufferOverflow => todo!(),
+                    //     usb_device::UsbError::EndpointOverflow => todo!(),
+                    //     usb_device::UsbError::EndpointMemoryOverflow => todo!(),
+                    //     usb_device::UsbError::InvalidEndpoint => todo!(),
+                    //     usb_device::UsbError::Unsupported => todo!(),
+                    //     usb_device::UsbError::InvalidState => todo!(),
+                    // }
+                }
+            }
+        } else {
+            delay.delay_ms(1u32);
+            let report = key_scan(&mut delay, ins, outs);
+            let events = debouncer.events(report, Some(keyberon::debounce::transpose));
+            // TODO send events and let the event data be fused up-stream before making the report?
+            for ev in events {
+                layout.event(ev);
+            }
+            layout.tick();
+            let report = layout.keycodes().collect::<KbHidReport>();
+            let bytes = report.as_bytes();
+            log::info!("sending: {:?}", bytes);
+            // let _ = esp_now.send(&PRIMARY_ADDR, bytes);
         }
     }
 }
