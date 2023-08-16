@@ -19,6 +19,8 @@ log = "0.4.19"
 usbd-hid = "0.6.1"
 usb-device = "0.2.9"
 usbd-human-interface-device = "0.4.3"
+num_enum_derive = "0.7.0"
+num_enum = {version = "0.7.0", default_features = false }
 
 [patch.crates-io]
 bitvec = {git = "https://github.com/alexanderkjall/bitvec.git", branch = "upgrade-radium-to-1"}
