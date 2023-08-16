@@ -5,7 +5,6 @@ use esp_backtrace as _;
 use hal::{prelude::*, Delay};
 use keyberon::debounce::Debouncer;
 
-
 #[allow(non_upper_case_globals)]
 pub struct UninitKeyPins<'a, const InN: usize, const OutN: usize> {
     pub ins: [&'a dyn InputPin<Error = Infallible>; InN],
@@ -44,7 +43,10 @@ impl<'a, const InN: usize, const OutN: usize> UninitKeyPins<'a, InN, OutN> {
         for out in &mut self.outs {
             let _ = out.set_high();
         }
-        InitedKeyPins {ins: self.ins, outs: self.outs}
+        InitedKeyPins {
+            ins: self.ins,
+            outs: self.outs,
+        }
     }
 }
 #[allow(non_upper_case_globals)]

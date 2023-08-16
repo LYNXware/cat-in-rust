@@ -2,9 +2,7 @@
 #![no_std]
 #![no_main]
 
-use core::convert::Infallible;
-
-use embedded_hal::digital::v2::{InputPin, OutputPin};
+use embedded_hal::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
 use hal::otg_fs::{UsbBus, USB};
@@ -28,7 +26,8 @@ use usbd_human_interface_device::device::{
 use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
 
-use crate::hardware::matrix::{UninitKeyPins, KeyDriver};
+use crate::hardware::matrix::{KeyDriver, UninitKeyPins};
+use crate::hardware::wheel::MouseWheelDriver;
 
 mod board_modules;
 mod hardware;
@@ -110,7 +109,6 @@ fn main() -> ! {
         .device_class(3)
         .build();
 
-
     let left_finger = UninitKeyPins {
         ins: [
             &io.pins.gpio21.into_pull_up_input(),
@@ -129,18 +127,17 @@ fn main() -> ! {
     };
     let mut left_finger = KeyDriver::new(left_finger, 5);
 
-    let mut encoder_a = io.pins.gpio35.into_pull_up_input();
-    let mut encoder_b = io.pins.gpio36.into_pull_up_input();
-    let mut wheel_gnd = io.pins.gpio0.into_push_pull_output();
-    let _ = wheel_gnd.set_low();
-    let mut wheel = WheelEncoder::new();
-
+    let pin_a = &io.pins.gpio35.into_pull_up_input();
+    let pin_b = &io.pins.gpio36.into_pull_up_input();
+    let gnd = &mut io.pins.gpio0.into_push_pull_output();
+    let wheel_pins = hardware::wheel::UninitWheelPins { pin_a, pin_b, gnd };
+    let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut layout = Layout::new(&board_modules::left_finger::LAYERS);
 
     let mut delay = Delay::new(&clocks);
     loop {
-        let scroll = wheel.read_encoder(&mut encoder_a, &mut encoder_b);
+        let scroll = wheel.read_encoder();
         delay.delay_us(300u32);
         let report = left_finger.key_scan(&mut delay);
         let events = left_finger
@@ -151,13 +148,11 @@ fn main() -> ! {
         }
         layout.tick();
         let ron_report = layout.keycodes();
-        let hid_report = ron_report
-            .map(|k: KeyCode| k as u8)
-            .map(HidKeyboard::from);
+        let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
 
         let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
         match keyboard.write_report(hid_report) {
-            Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {},
+            Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
             Err(e) => {
                 core::panic!("Failed to write keyboard report: {:?}", e)
             }
@@ -177,7 +172,7 @@ fn main() -> ! {
             };
             let mouse = classes.device::<WheelMouse<'_, _>, _>();
             match mouse.write_report(&mouse_report) {
-                Err(UsbHidError::WouldBlock) | Ok(_) => {},
+                Err(UsbHidError::WouldBlock) | Ok(_) => {}
                 Err(e) => {
                     core::panic!("Failed to write mouse report: {:?}", e)
                 }
@@ -187,44 +182,44 @@ fn main() -> ! {
     }
 }
 
-/// TODO: wrap up the pins somehow
-struct WheelEncoder {
-    value: u8,
-    state: bool,
-    prev_state: bool,
-    scroll_val: i8,
-}
-
-impl WheelEncoder {
-    fn new() -> Self {
-        Self {
-            value: 0,
-            state: true,
-            prev_state: true,
-            scroll_val: 0,
-        }
-    }
-    fn read_encoder(
-        &mut self,
-        enc_a: &mut dyn InputPin<Error = Infallible>,
-        enc_b: &mut dyn InputPin<Error = Infallible>,
-    ) -> Option<KeyCode> {
-        self.state = enc_a.is_high().unwrap();
-        let res = if self.state == self.prev_state {
-            None
-        } else {
-            let scroll = if enc_b.is_high().unwrap() == self.state {
-                self.value -= 1;
-                self.scroll_val = -1;
-                KeyCode::MediaScrollDown
-            } else {
-                self.value += 1;
-                self.scroll_val = 1;
-                KeyCode::MediaScrollUp
-            };
-            Some(scroll)
-        };
-        self.prev_state = self.state;
-        res
-    }
-}
+// /// TODO: wrap up the pins somehow
+// struct WheelEncoder {
+//     value: u8,
+//     state: bool,
+//     prev_state: bool,
+//     scroll_val: i8,
+// }
+//
+// impl WheelEncoder {
+//     fn new() -> Self {
+//         Self {
+//             value: 0,
+//             state: true,
+//             prev_state: true,
+//             scroll_val: 0,
+//         }
+//     }
+//     fn read_encoder(
+//         &mut self,
+//         enc_a: &mut dyn InputPin<Error = Infallible>,
+//         enc_b: &mut dyn InputPin<Error = Infallible>,
+//     ) -> Option<KeyCode> {
+//         self.state = enc_a.is_high().unwrap();
+//         let res = if self.state == self.prev_state {
+//             None
+//         } else {
+//             let scroll = if enc_b.is_high().unwrap() == self.state {
+//                 self.value -= 1;
+//                 self.scroll_val = -1;
+//                 KeyCode::MediaScrollDown
+//             } else {
+//                 self.value += 1;
+//                 self.scroll_val = 1;
+//                 KeyCode::MediaScrollUp
+//             };
+//             Some(scroll)
+//         };
+//         self.prev_state = self.state;
+//         res
+//     }
+// }

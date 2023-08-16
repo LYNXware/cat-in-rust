@@ -1,2 +1,2 @@
 pub mod matrix;
-// mod wheel;
+pub mod wheel;
