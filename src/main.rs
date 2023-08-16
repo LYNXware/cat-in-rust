@@ -16,6 +16,7 @@ use hal::{
     Rtc, IO,
 };
 use hal::{prelude::*, Delay};
+use keyberon::debounce::Debouncer;
 use keyberon::{key_code::KbHidReport, layout::Layout};
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 use usbd_hid::{
@@ -30,7 +31,25 @@ struct ButtonMatrix<'a, const InN: usize, const OutN: usize> {
     outs: [&'a mut dyn OutputPin<Error = Infallible>; OutN],
 }
 #[allow(non_upper_case_globals)]
+struct BoardModule<'a, const InN: usize, const OutN: usize> {
+    matrix: ButtonMatrix<'a, InN, OutN>,
+    debouncer: Debouncer<[[bool;InN];OutN]>,
+}
+#[allow(non_upper_case_globals)]
+impl<'a, const InN: usize, const OutN: usize> BoardModule<'a, InN, OutN> {
+    fn new(mut matrix: ButtonMatrix<'a, InN, OutN>, debounce_tolerance: u16) -> Self {
+        matrix.init();
+        Self{ matrix, debouncer: ButtonMatrix::gen_debouncer(debounce_tolerance) }
+    }
+}
+
+#[allow(non_upper_case_globals)]
 impl<'a, const InN: usize, const OutN: usize> ButtonMatrix<'a, InN, OutN> {
+    fn init(&mut self) {
+        for out in &mut self.outs {
+            let _ = out.set_high();
+        }
+    }
     fn key_scan(&mut self, delay: &mut Delay) -> [[bool; InN]; OutN] {
         let mut res = [[false; InN]; OutN];
         for (out_dx, out_pin) in self.outs.iter_mut().enumerate() {
@@ -42,6 +61,9 @@ impl<'a, const InN: usize, const OutN: usize> ButtonMatrix<'a, InN, OutN> {
             let _todo_logerr = out_pin.set_high();
         }
         res
+    }
+    fn gen_debouncer(n: u16) -> Debouncer<[[bool;InN];OutN]> {
+        Debouncer::new([[false;InN];OutN], [[false;InN];OutN], n)
     }
 }
 
@@ -119,38 +141,37 @@ fn main() -> ! {
         .device_class(3)
         .build();
 
-    let mut left_finger = ButtonMatrix {
+    let left_finger = ButtonMatrix {
         ins: [
+            &io.pins.gpio21.into_pull_up_input(),
             &io.pins.gpio47.into_pull_up_input(),
             &io.pins.gpio48.into_pull_up_input(),
             &io.pins.gpio45.into_pull_up_input(),
-            &io.pins.gpio0.into_pull_up_input(),
         ],
         outs: [
-            &mut io.pins.gpio38.into_push_pull_output(),
-            &mut io.pins.gpio39.into_push_pull_output(),
-            &mut io.pins.gpio40.into_push_pull_output(),
-            &mut io.pins.gpio41.into_push_pull_output(),
             &mut io.pins.gpio42.into_push_pull_output(),
-            &mut io.pins.gpio2.into_push_pull_output(),
+            &mut io.pins.gpio41.into_push_pull_output(),
+            &mut io.pins.gpio40.into_push_pull_output(),
+            &mut io.pins.gpio39.into_push_pull_output(),
+            &mut io.pins.gpio38.into_push_pull_output(),
+            &mut io.pins.gpio37.into_push_pull_output(),
         ],
     };
-    for out in &mut left_finger.outs {
-        out.set_high().unwrap();
-    }
-    let mut debouncer = keyberon::debounce::Debouncer::new([[false; 4]; 6], [[false; 4]; 6], 5);
+    let mut left_finger = BoardModule::new(left_finger, 5);
+
     let mut layout = Layout::new(&board_modules::left_finger::LAYERS);
 
     let mut delay = Delay::new(&clocks);
     loop {
         delay.delay_ms(1u32);
-        let report = left_finger.key_scan(&mut delay);
-        let events = debouncer.events(report, Some(keyberon::debounce::transpose));
+        let report = left_finger.matrix.key_scan(&mut delay);
+        let events = left_finger.debouncer.events(report, Some(keyberon::debounce::transpose));
         for ev in events {
             layout.event(ev);
         }
         layout.tick();
         let report = layout.keycodes().collect::<KbHidReport>();
+
         let bytes = report.as_bytes();
         if bytes.iter().any(|&b| b != 0) {
             log::debug!("{:?}", report);
