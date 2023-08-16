@@ -1,34 +1,37 @@
-use core::{convert::Infallible, num::{NonZeroU8, NonZeroI32}};
+use core::convert::Infallible;
 use embedded_hal::digital::v2::OutputPin;
 use esp_backtrace as _;
 use hal::{prelude::*, Delay};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use usbd_human_interface_device::device::mouse::WheelMouseReport;
 
 #[repr(u8)]
 #[derive(IntoPrimitive, TryFromPrimitive)]
 enum ADNSData {
     ProductId = 0x12, // should be 0x12,
     ProductId2 = 0x3e,
-    RevisionId = 0b1,
-    DeltaYReg = 0b11,
-    DeltaXReg = 0b100,
-    SqualReg = 0b101,
-    MaximumPixelReg = 0b1000,
-    MinimumPixelReg = 0b1010,
-    PixelSumReg = 0b1001,
-    PixelDataReg = 0b1011,
-    ShutterUpperReg = 0b110,
-    ShutterLowerReg = 0b111,
-    Reset = 0x3a,
+    RevisionId = 0x01,
     Cpi500v = 0x00,
     // TODO: 1 already assigned to revision id?
     // Cpi1000v =             0x01,
 }
+#[repr(u8)]
+#[derive(IntoPrimitive, TryFromPrimitive)]
+enum ADNSRegs {
+    DeltaYReg = 0x03,
+    DeltaXReg = 0x04,
+    SqualReg = 0x05,
+    ShutterUpperReg = 0x06,
+    ShutterLowerReg = 0x07,
+    MaximumPixelReg = 0x08,
+    PixelSumReg = 0x09,
+    MinimumPixelReg = 0x0A,
+    PixelDataReg = 0x0B,
+    Reset = 0x3a,
+}
 pub struct UninitADNS<'a> {
     pub sdio: &'a mut dyn OutputPin<Error = Infallible>,
     pub srl_clk: &'a mut dyn OutputPin<Error = Infallible>,
-    pub not_reset: &'a dyn OutputPin<Error = Infallible>,
+    pub not_reset: &'a mut dyn OutputPin<Error = Infallible>,
     pub not_chip_sel: &'a mut dyn OutputPin<Error = Infallible>,
 }
 
@@ -43,9 +46,9 @@ impl<'a> UninitADNS<'a> {
         };
 
         res.sync(delay);
-        res.write_reg(0x5a, ADNSData::Reset, delay);
+        res.write_reg(ADNSRegs::Reset, 0x5a, delay);
         delay.delay_us(50u16);
-        res.not_reset.set_high();
+        let _ = res.not_reset.set_high();
         res
     }
 }
@@ -53,7 +56,7 @@ impl<'a> UninitADNS<'a> {
 struct ADNSDriver<'a> {
     sdio: &'a mut dyn OutputPin<Error = Infallible>,
     srl_clk: &'a mut dyn OutputPin<Error = Infallible>,
-    not_reset: &'a dyn OutputPin<Error = Infallible>,
+    not_reset: &'a mut dyn OutputPin<Error = Infallible>,
     not_chip_sel: &'a mut dyn OutputPin<Error = Infallible>,
     pix: [u8; 360],
 }
@@ -65,22 +68,23 @@ impl<'a> ADNSDriver<'a> {
         let _ = self.not_chip_sel.set_high();
     }
 
-    fn write_reg(&mut self, mut addr: ADNSData, data: u8, delay: &mut Delay) {
-        let mut data: u8 = data.into();
+    fn write_reg(&mut self, addr: ADNSRegs, mut data: u8, delay: &mut Delay) {
+        let mut addr: u8 = addr.into();
         let _ = self.not_chip_sel.set_low();
         for _ in 0..8 {
             let _ = self.srl_clk.set_low();
             delay.delay_us(1u16);
-            if addr as u8 & 0b1000_0000 != 0 {
+            if addr & 0b1000_0000 != 0 {
                 let _ = self.sdio.set_high();
             } else {
                 let _ = self.sdio.set_low();
             }
-            addr = ((addr as u8) << 1u8).try_into().unwrap();
+            addr <<= 1;
             let _ = self.srl_clk.set_high();
             delay.delay_us(1u16);
         }
 
+        
         for _ in 0..8 {
             let _ = self.srl_clk.set_low();
             delay.delay_us(1u16);
@@ -97,33 +101,35 @@ impl<'a> ADNSDriver<'a> {
         let _ = self.not_chip_sel.set_high();
     }
 
-    fn read(&mut self, delay: &mut Delay) -> (Option<NonZeroI32>, Option<NonZeroI32>) {
-        let y_sensor: Option<NonZeroI8> = self.read_reg(ADNSData::DeltaYReg, delay).into();
-        let x_sensor: Option<NonZeroI8> = self.read_reg(ADNSData::DeltaXReg, delay).into();
+    fn read(&mut self, delay: &mut Delay) -> (i32, i32) {
+        let y_sensor: i32 = self.read_reg(ADNSRegs::DeltaYReg, delay) as i32;
+        let x_sensor: i32 = self.read_reg(ADNSRegs::DeltaXReg, delay) as i32;
 
-        let dy = y_sensor.map(|dy|{ dy * -1/*layouts_manager.mouse_factor[layer_control.active_layer][0] * -1*/ });
-        let dx = x_sensor.map(|dx| { dx * 1/*layouts_manager.mouse_factor[layer_control.active_layer][1]*/ } );
+        let dy = y_sensor * -1; // layouts_manager.mouse_factor[layer_control.active_layer][0] * -1
+        let dx = x_sensor; //layouts_manager.mouse_factor[layer_control.active_layer][1];
 
         (dy, dx)
 
     }
 
-    fn read_reg(&mut self, mut addr: u8, delay: &mut Delay) -> bool {
+    fn read_reg(&mut self, addr: ADNSRegs, delay: &mut Delay) -> u8 {
+        let mut addr = addr as u8;
         for _ in 0..8 {
-            self.not_chip_sel.set_low();
-            self.srl_clk.set_low();
-            if addr & 0x80 != 0 {
-                self.sdio.set_high();
+            let _ = self.not_chip_sel.set_low();
+            let _ = self.srl_clk.set_low();
+            if (addr  & 0x80u8) != 0 {
+                let _ = self.sdio.set_high();
             } else {
-                self.sdio.set_low();
+                let _ = self.sdio.set_low();
             }
 
             addr <<= 1;
             delay.delay_us(1u16);
-            self.srl_clk.set_high();
+            let _ = self.srl_clk.set_high();
             delay.delay_us(1u16);
         }
 
-        let mut is_read = false;
+        let mut bit_banged_read = 0;
+        todo!("finish implementing")
     }
 }
