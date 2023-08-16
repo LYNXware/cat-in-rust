@@ -28,7 +28,7 @@ use usbd_human_interface_device::device::{
 use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
 
-use crate::hardware::matrix::{ButtonMatrix, BoardModule};
+use crate::hardware::matrix::{UninitKeyPins, KeyDriver};
 
 mod board_modules;
 mod hardware;
@@ -111,7 +111,7 @@ fn main() -> ! {
         .build();
 
 
-    let left_finger = ButtonMatrix {
+    let left_finger = UninitKeyPins {
         ins: [
             &io.pins.gpio21.into_pull_up_input(),
             &io.pins.gpio47.into_pull_up_input(),
@@ -127,13 +127,14 @@ fn main() -> ! {
             &mut io.pins.gpio37.into_push_pull_output(),
         ],
     };
+    let mut left_finger = KeyDriver::new(left_finger, 5);
+
     let mut encoder_a = io.pins.gpio35.into_pull_up_input();
     let mut encoder_b = io.pins.gpio36.into_pull_up_input();
     let mut wheel_gnd = io.pins.gpio0.into_push_pull_output();
     let _ = wheel_gnd.set_low();
     let mut wheel = WheelEncoder::new();
 
-    let mut left_finger = BoardModule::new(left_finger, 5);
 
     let mut layout = Layout::new(&board_modules::left_finger::LAYERS);
 
@@ -141,7 +142,7 @@ fn main() -> ! {
     loop {
         let scroll = wheel.read_encoder(&mut encoder_a, &mut encoder_b);
         delay.delay_us(300u32);
-        let report = left_finger.matrix.key_scan(&mut delay);
+        let report = left_finger.key_scan(&mut delay);
         let events = left_finger
             .debouncer
             .events(report, Some(keyberon::debounce::transpose));
