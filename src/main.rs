@@ -24,6 +24,26 @@ use usbd_hid::{
 };
 
 mod board_modules;
+#[allow(non_upper_case_globals)]
+struct ButtonMatrix<'a, const InN: usize, const OutN: usize> {
+    ins: [&'a dyn InputPin<Error = Infallible>; InN],
+    outs: [&'a mut dyn OutputPin<Error = Infallible>; OutN],
+}
+#[allow(non_upper_case_globals)]
+impl<'a, const InN: usize, const OutN: usize> ButtonMatrix<'a, InN, OutN> {
+    fn key_scan(&mut self, delay: &mut Delay) -> [[bool; InN]; OutN] {
+        let mut res = [[false; InN]; OutN];
+        for (out_dx, out_pin) in self.outs.iter_mut().enumerate() {
+            let _todo_logerr = out_pin.set_low();
+            delay.delay_us(5u32);
+            for (in_dx, in_pin) in self.ins.iter().enumerate() {
+                res[out_dx][in_dx] = in_pin.is_low().unwrap();
+            }
+            let _todo_logerr = out_pin.set_high();
+        }
+        res
+    }
+}
 
 static mut USB_MEM: [u32; 1024] = [0; 1024];
 
@@ -99,21 +119,23 @@ fn main() -> ! {
         .device_class(3)
         .build();
 
-    let ins: &[&dyn InputPin<Error = Infallible>; 4] = &[
-        &io.pins.gpio21.into_pull_up_input(),
-        &io.pins.gpio47.into_pull_up_input(),
-        &io.pins.gpio48.into_pull_up_input(),
-        &io.pins.gpio45.into_pull_up_input(),
-    ];
-    let outs: &mut [&mut dyn OutputPin<Error = Infallible>; 6] = &mut [
-        &mut io.pins.gpio37.into_push_pull_output(),
-        &mut io.pins.gpio38.into_push_pull_output(),
-        &mut io.pins.gpio39.into_push_pull_output(),
-        &mut io.pins.gpio40.into_push_pull_output(),
-        &mut io.pins.gpio41.into_push_pull_output(),
-        &mut io.pins.gpio42.into_push_pull_output(),
-    ];
-    for out in outs.iter_mut() {
+    let mut left_finger = ButtonMatrix {
+        ins: [
+            &io.pins.gpio47.into_pull_up_input(),
+            &io.pins.gpio48.into_pull_up_input(),
+            &io.pins.gpio45.into_pull_up_input(),
+            &io.pins.gpio0.into_pull_up_input(),
+        ],
+        outs: [
+            &mut io.pins.gpio38.into_push_pull_output(),
+            &mut io.pins.gpio39.into_push_pull_output(),
+            &mut io.pins.gpio40.into_push_pull_output(),
+            &mut io.pins.gpio41.into_push_pull_output(),
+            &mut io.pins.gpio42.into_push_pull_output(),
+            &mut io.pins.gpio2.into_push_pull_output(),
+        ],
+    };
+    for out in &mut left_finger.outs {
         out.set_high().unwrap();
     }
     let mut debouncer = keyberon::debounce::Debouncer::new([[false; 4]; 6], [[false; 4]; 6], 5);
@@ -122,7 +144,7 @@ fn main() -> ! {
     let mut delay = Delay::new(&clocks);
     loop {
         delay.delay_ms(1u32);
-        let report = key_scan(&mut delay, ins, outs);
+        let report = left_finger.key_scan(&mut delay);
         let events = debouncer.events(report, Some(keyberon::debounce::transpose));
         for ev in events {
             layout.event(ev);
@@ -141,21 +163,4 @@ fn main() -> ! {
             log::debug!("{:?}", res);
         }
     }
-}
-
-fn key_scan<const IN_N: usize, const OUT_N: usize>(
-    delay: &mut Delay,
-    ins: &[&dyn InputPin<Error = Infallible>; IN_N],
-    outs: &mut [&mut dyn OutputPin<Error = Infallible>; OUT_N],
-) -> [[bool; IN_N]; OUT_N] {
-    let mut res = [[false; IN_N]; OUT_N];
-    for (out_dx, out_pin) in outs.iter_mut().enumerate() {
-        let _todo_logerr = out_pin.set_low();
-        delay.delay_us(5u32);
-        for (in_dx, in_pin) in ins.iter().enumerate() {
-            res[out_dx][in_dx] = in_pin.is_low().unwrap();
-        }
-        let _todo_logerr = out_pin.set_high();
-    }
-    res
 }
