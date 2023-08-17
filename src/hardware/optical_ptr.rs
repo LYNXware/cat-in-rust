@@ -129,6 +129,23 @@ impl<'a> ADNSDriver<'a> {
             delay.delay_us(1u16);
         }
 
+        let mut res = 0u8;
+
+        for i in 0..8 {
+            let _ = self.srl_clk.set_low();
+
+            // How to make the adns driver have a pin that is both output and input.
+            if self.sdio.is_high() {
+                res |= 0x01;
+            }
+            if i != 7 {
+                res <<= 1;
+            }
+            let _ = self.srl_clk.set_high();
+        }
+
+
+
         let mut bit_banged_read = 0;
         todo!("finish implementing")
     }
