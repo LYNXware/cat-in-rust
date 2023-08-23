@@ -32,25 +32,54 @@ enum ADNSRegs {
     PixelDataReg = 0x0B,
     Reset = 0x3a,
 }
+
+struct GpioHolder<P>
+where
+    P: hal::gpio::InputPin
+        + hal::gpio::OutputPin
+{
+    pin: Option<P>,
+}
+
+impl<P> GpioHolder<P>
+where
+    P: hal::gpio::InputPin
+        + hal::gpio::OutputPin
+{
+    fn do_output(&mut self) {
+        let mut out = self.pin.take().unwrap();
+        out.set_to_push_pull_output();
+        out.set_output_high(true);
+        self.pin.replace(out);
+    }
+
+    fn do_input(&mut self) -> bool {
+        let mut inp = self.pin.take().unwrap();
+        inp.set_to_input();
+        let res = inp.is_input_high();
+        self.pin.replace(inp);
+        res
+    }
+}
 pub struct UninitADNS<'a, P> 
 where
-    P: GpioProperties,
-    <P as GpioProperties>::PinType: IsInputPin + IsOutputPin
+    P: hal::gpio::InputPin
+        + hal::gpio::OutputPin
 {
-    pub sdio: P,
+    pub sdio: GpioHolder<P>,
     pub srl_clk: &'a mut dyn OutputPin<Error = Infallible>,
     pub not_reset: &'a mut dyn OutputPin<Error = Infallible>,
     pub not_chip_sel: &'a mut dyn OutputPin<Error = Infallible>,
 }
 
-impl<'a, const NUM: u8> UninitADNS<'a, GpioPin<Output<PushPull>, NUM>> 
+impl<'a, P> UninitADNS<'a, P> 
 where
-    GpioPin<Output<PushPull>, NUM>: GpioProperties,
-    <GpioPin<Output<PushPull>, NUM> as GpioProperties>::PinType: IsInputPin + IsOutputPin
+    P: hal::gpio::InputPin
+        + hal::gpio::OutputPin
 {
-    fn init(self, delay: &mut Delay) -> ADNSWriter<'a> {
-        let mut res = ADNSWriter {
-            sdio: &mut self.sdio.into_push_pull_output(),
+    fn init(self, delay: &mut Delay) -> ADNSDriver<'a, P> {
+        let mut res = ADNSDriver {
+            sdio: GpioHolder{pin: Some(self.sdio.pin.unwrap())},
             srl_clk: self.srl_clk,
             not_reset: self.not_reset,
             not_chip_sel: self.not_chip_sel,
@@ -65,24 +94,21 @@ where
     }
 }
 
-struct ADNSReader<'a>
+struct ADNSDriver<'a, P>
+where
+    P: hal::gpio::InputPin
+        + hal::gpio::OutputPin
 {
-    sdio: &'a mut dyn InputPin<Error = Infallible>,
+    sdio: GpioHolder<P>,
     srl_clk: &'a mut dyn OutputPin<Error = Infallible>,
     not_reset: &'a mut dyn OutputPin<Error = Infallible>,
     not_chip_sel: &'a mut dyn OutputPin<Error = Infallible>,
     pix: [u8; 360],
 }
-struct ADNSWriter<'a>
-{
-    sdio: &'a mut (dyn  OutputPin<Error = Infallible> + GpioProperties<PinType = InputOutputPinType>),
-    srl_clk: &'a mut dyn OutputPin<Error = Infallible>,
-    not_reset: &'a mut dyn OutputPin<Error = Infallible>,
-    not_chip_sel: &'a mut dyn OutputPin<Error = Infallible>,
-    pix: [u8; 360],
-}
-
-impl<'a> ADNSWriter<'a> 
+impl<'a, P> ADNSDriver<'a, P> 
+where
+    P: hal::gpio::InputPin
+        + hal::gpio::OutputPin
 {
     fn sync(&mut self, delay: &mut Delay) {
         let _ = self.not_chip_sel.set_low();
@@ -97,7 +123,7 @@ impl<'a> ADNSWriter<'a>
             let _ = self.srl_clk.set_low();
             delay.delay_us(1u16);
             if addr & 0b1000_0000 != 0 {
-                let _ = self.sdio.set_high();
+                let _ = self.sdio.pin.unwrap().set_high();
             } else {
                 let _ = self.sdio.set_low();
             }
@@ -121,32 +147,6 @@ impl<'a> ADNSWriter<'a>
         delay.delay_us(20u16);
         let _ = self.not_chip_sel.set_high();
     }
-}
-
-// impl<R, W> From<ADNSDriver<R>> for ADNSDriver<W>
-// where
-//     R: Send,
-//     W: Sync,
-// {
-//     fn from(other: ADNSDriver<R>) -> Self {
-//         Self {
-//             sdio: other.sdio.into_push_pull_output(),
-//             srl_clk: other.srl_clk,
-//             not_reset: other.not_reset,
-//             not_chip_sel: other.not_chip_sel,
-//             pix: other.pix,
-//         }
-//     }
-// }
-//     fn from_reader<P: InputPin + GpioProperties>(other: ADNSDriver<P>) -> Self 
-//     where
-//         <P as GpioProperties>::PinType: IsOutputPin
-//     {
-//     }
-// }
-
-impl<'a> ADNSReader<'a> 
-{
     fn read(&mut self, delay: &mut Delay) -> (i32, i32) {
         let y_sensor: i32 = self.read_reg(ADNSRegs::DeltaYReg, delay) as i32;
         let x_sensor: i32 = self.read_reg(ADNSRegs::DeltaXReg, delay) as i32;
@@ -192,17 +192,5 @@ impl<'a> ADNSReader<'a>
 
         let mut bit_banged_read = 0;
         todo!("finish implementing")
-    }
-    fn from_writer<P: OutputPin + GpioProperties>(other: ADNSDriver<P>) -> Self 
-    where
-      <P as GpioProperties>::PinType: OutputPin
-    {
-        Self {
-            sdio: other.sdio.into_push_pull_output().unwrap(),
-            srl_clk: other.srl_clk,
-            not_reset: other.not_reset,
-            not_chip_sel: other.not_chip_sel,
-            pix: other.pix,
-        }
     }
 }
