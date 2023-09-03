@@ -193,6 +193,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-io"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bbadc628dc286b9ae02f0cb0f5411c056eb7487b72f0083203f115de94060"
+
+[[package]]
 name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -227,7 +233,8 @@ dependencies = [
 
 [[package]]
 name = "esp-hal-common"
-version = "0.10.0"
+version = "0.11.0"
+source = "git+https://github.com/Ben-PH/esp-hal-downstream.git?branch=feature/hlist_pins#abb34d6ab8bda28f0e8c4a1c56f93f0161f5492c"
 dependencies = [
  "basic-toml",
  "bitfield 0.14.0",
@@ -236,10 +243,11 @@ dependencies = [
  "critical-section",
  "embedded-dma",
  "embedded-hal",
+ "embedded-io",
  "esp-hal-procmacros",
  "esp-synopsys-usb-otg",
  "esp32s3",
- "frunk 0.4.2",
+ "frunk",
  "fugit",
  "lock_api",
  "log",
@@ -256,6 +264,7 @@ dependencies = [
 [[package]]
 name = "esp-hal-procmacros"
 version = "0.6.0"
+source = "git+https://github.com/Ben-PH/esp-hal-downstream.git?branch=feature/hlist_pins#abb34d6ab8bda28f0e8c4a1c56f93f0161f5492c"
 dependencies = [
  "darling",
  "proc-macro-crate",
@@ -289,8 +298,9 @@ dependencies = [
 
 [[package]]
 name = "esp32s3"
-version = "0.19.0"
-source = "git+https://github.com/esp-rs/esp-pacs?rev=ce6d5b5#ce6d5b5641be55241e77cdb5915b2e3513c8a7a5"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e482df6923df18ccd05ab80b54be5af32497f112f5b60ee05dc9d57562e68c"
 dependencies = [
  "critical-section",
  "vcell",
@@ -299,10 +309,9 @@ dependencies = [
 
 [[package]]
 name = "esp32s3-hal"
-version = "0.10.0"
+version = "0.11.0"
+source = "git+https://github.com/Ben-PH/esp-hal-downstream.git?branch=feature/hlist_pins#abb34d6ab8bda28f0e8c4a1c56f93f0161f5492c"
 dependencies = [
- "bare-metal",
- "embedded-hal",
  "esp-hal-common",
 ]
 
@@ -315,24 +324,12 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 [[package]]
 name = "frunk"
 version = "0.4.2"
-dependencies = [
- "frunk_core 0.4.2",
- "frunk_derives 0.4.2",
-]
-
-[[package]]
-name = "frunk"
-version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11a351b59e12f97b4176ee78497dff72e4276fb1ceb13e19056aca7fa0206287"
 dependencies = [
- "frunk_core 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "frunk_derives 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "frunk_core",
+ "frunk_derives",
 ]
-
-[[package]]
-name = "frunk_core"
-version = "0.4.2"
 
 [[package]]
 name = "frunk_core"
@@ -343,30 +340,10 @@ checksum = "af2469fab0bd07e64ccf0ad57a1438f63160c69b2e57f04a439653d68eb558d6"
 [[package]]
 name = "frunk_derives"
 version = "0.4.2"
-dependencies = [
- "frunk_proc_macro_helpers 0.1.2",
- "proc-macro2",
- "quote",
- "syn 2.0.28",
-]
-
-[[package]]
-name = "frunk_derives"
-version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0fa992f1656e1707946bbba340ad244f0814009ef8c0118eb7b658395f19a2e"
 dependencies = [
- "frunk_proc_macro_helpers 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote",
- "syn 2.0.28",
-]
-
-[[package]]
-name = "frunk_proc_macro_helpers"
-version = "0.1.2"
-dependencies = [
- "frunk_core 0.4.2",
- "proc-macro2",
+ "frunk_proc_macro_helpers",
  "quote",
  "syn 2.0.28",
 ]
@@ -377,7 +354,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35b54add839292b743aeda6ebedbd8b11e93404f902c56223e51b9ec18a13d2c"
 dependencies = [
- "frunk_core 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "frunk_core",
  "proc-macro2",
  "quote",
  "syn 2.0.28",
@@ -499,9 +476,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.18"
+version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "518ef76f2f87365916b142844c16d8fefd85039bc5699050210a7778ee1cd1de"
+checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "memchr"
@@ -924,7 +901,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "809d98d59a6fccbdcf27026101e9a753c5a98d66898061eee7dd8bfd4eff1d03"
 dependencies = [
- "frunk 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "frunk",
  "fugit",
  "heapless",
  "num_enum",

@@ -7,7 +7,7 @@ use core::convert::Infallible;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
-use hal::gpio::{GpioPin, Output, Unknown, Input, PushPull, PullUp};
+use hal::gpio::{GpioPin, Output, Input, PushPull, PullUp};
 use hal::otg_fs::{UsbBus, USB};
 use hal::{
     frunk::{self, hlist::Plucker},
