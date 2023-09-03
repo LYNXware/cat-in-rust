@@ -7,8 +7,10 @@ use core::convert::Infallible;
 use embedded_hal::digital::v2::{InputPin, OutputPin};
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
+use hal::gpio::{GpioPin, Output, Unknown, Input, PushPull, PullUp};
 use hal::otg_fs::{UsbBus, USB};
 use hal::{
+    frunk::{self, hlist::Plucker},
     clock::ClockControl,
     peripherals::Peripherals,
     timer::TimerGroup,
@@ -115,12 +117,14 @@ fn main() -> ! {
     log::trace!("\t wdt1.disable()");
     log::info!("clocks configured: rtc-wdt, wdt0/1 disabled");
 
-    let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-    let uart_vdd_pin = io.pins.gpio1;
+    let io = IO::hl_new(peripherals.GPIO, peripherals.IO_MUX);
+    let (uart_vdd_pin, io): (GpioPin<_, 1>, _) = io.pluck();
     let mut uart_vdd_pin = uart_vdd_pin.into_push_pull_output();
     uart_vdd_pin.set_high().unwrap();
 
-    let t_r_pins = UartTxRx::new_tx_rx(io.pins.gpio44, io.pins.gpio43);
+    let (p44, io): (GpioPin<_, 44>, _) = io.pluck();
+    let (p43, io): (GpioPin<_, 43>, _) = io.pluck();
+    let t_r_pins = UartTxRx::new_tx_rx(p44, p43);
     // will log in the background. Don't need to use directly
     let mut _uart = Uart::new_with_config(
         peripherals.UART0,
@@ -132,13 +136,23 @@ fn main() -> ! {
 
     log::info!("uart-setup: gnd: gnd, tx: 44, rx: 43, pwr: 1");
 
-    let usb = USB::new(
-        peripherals.USB0,
-        io.pins.gpio18,
-        io.pins.gpio19,
-        io.pins.gpio20,
-        &mut system.peripheral_clock_control,
-    );
+    // let (usb, io) = USB::hl_new(peripherals.USB0, io, &mut system.peripheral_clock_control);
+    let (usb, io) = if false {
+        // USB::hl_new(io, peripherals.USB0, &mut system.peripheral_clock_control);
+        unimplemented!();
+    } else {
+        let (p18, io): (GpioPin<_, 18>, _) = io.pluck();
+        let (p19, io): (GpioPin<_, 19>, _) = io.pluck();
+        let (p20, io): (GpioPin<_, 20>, _) = io.pluck();
+        let usb = USB::new(
+            peripherals.USB0,
+            p18,
+            p19,
+            p20,
+            &mut system.peripheral_clock_control,
+        );
+        (usb, io)
+    };
 
     let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
     let mut classes = UsbHidClassBuilder::new()
@@ -152,27 +166,54 @@ fn main() -> ! {
         .device_class(3)
         .build();
 
+    // if list pluck done:
+    // let (ins, io): (gpiopin_HList!(21, 47, 48, 45), _) = io.pluck();
+    // or...
+    // let (ins, io): (<same>, _) = io.pluck()
+    //     .pluck()
+    //     .pluck()
+    //     .pluck()
+    //     .map(|pin| &pin.into_pull_up_input())
+    //     .collect();
+    //
+    // let (outs, io): (gpiopin_HList!(42, 41, 40, 39, 38, 37), _) = io.pluck();
+    let (p21, io): (GpioPin<_, 21>, _) = io.pluck();
+    let (p47, io): (GpioPin<_, 47>, _) = io.pluck();
+    let (p48, io): (GpioPin<_, 48>, _) = io.pluck();
+    let (p45, io): (GpioPin<_, 45>, _) = io.pluck();
+
+
+    let (p42, io): (GpioPin<_, 42>, _) = io.pluck();
+    let (p41, io): (GpioPin<_, 41>, _) = io.pluck();
+    let (p40, io): (GpioPin<_, 40>, _) = io.pluck();
+    let (p39, io): (GpioPin<_, 39>, _) = io.pluck();
+    let (p38, io): (GpioPin<_, 38>, _) = io.pluck();
+    let (p37, io): (GpioPin<_, 37>, _) = io.pluck();
     let left_finger = ButtonMatrix {
         ins: [
-            &io.pins.gpio21.into_pull_up_input(),
-            &io.pins.gpio47.into_pull_up_input(),
-            &io.pins.gpio48.into_pull_up_input(),
-            &io.pins.gpio45.into_pull_up_input(),
+            &p21.into_pull_up_input(),
+            &p47.into_pull_up_input(),
+            &p48.into_pull_up_input(),
+            &p45.into_pull_up_input(),
         ],
         outs: [
-            &mut io.pins.gpio42.into_push_pull_output(),
-            &mut io.pins.gpio41.into_push_pull_output(),
-            &mut io.pins.gpio40.into_push_pull_output(),
-            &mut io.pins.gpio39.into_push_pull_output(),
-            &mut io.pins.gpio38.into_push_pull_output(),
-            &mut io.pins.gpio37.into_push_pull_output(),
+            &mut p42.into_push_pull_output(),
+            &mut p41.into_push_pull_output(),
+            &mut p40.into_push_pull_output(),
+            &mut p39.into_push_pull_output(),
+            &mut p38.into_push_pull_output(),
+            &mut p37.into_push_pull_output(),
         ],
     };
-    let mut encoder_a = io.pins.gpio35.into_pull_up_input();
-    let mut encoder_b = io.pins.gpio36.into_pull_up_input();
-    let mut wheel_gnd = io.pins.gpio0.into_push_pull_output();
-    let _ = wheel_gnd.set_low();
-    let mut wheel = WheelEncoder::new();
+    // construction + initialization is dep-injected, using ListBuild
+    let (mut wheel, _io) = WheelEncoder::hl_new(io, 0, true, true, 0);
+
+    // used to be: 
+    // let mut encoder_a = io.pins.gpio35.into_pull_up_input();
+    // let mut encoder_b = io.pins.gpio36.into_pull_up_input();
+    // let mut wheel_gnd = io.pins.gpio0.into_push_pull_output();
+    // let _ = wheel_gnd.set_low();
+    // let mut wheel = WheelEncoder::new();
 
     let mut left_finger = BoardModule::new(left_finger, 5);
 
@@ -180,7 +221,7 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
     loop {
-        let scroll = wheel.read_encoder(&mut encoder_a, &mut encoder_b);
+        let scroll = wheel.read_encoder();
         delay.delay_us(300u32);
         let report = left_finger.matrix.key_scan(&mut delay);
         let events = left_finger
@@ -228,32 +269,33 @@ fn main() -> ! {
 }
 
 /// TODO: wrap up the pins somehow
+#[derive(frunk::ListBuild)]
 struct WheelEncoder {
+    #[list_build_ignore]
     value: u8,
+    #[list_build_ignore]
     state: bool,
+    #[plucker(GpioPin<Unknown, 35>, map=pin_a.into_pull_up_input())]
+    pin_a: GpioPin<Input<PullUp>, 35>,
+    #[plucker(GpioPin<Unknown, 36>, map=pin_b.into_pull_up_input())]
+    pin_b: GpioPin<Input<PullUp>, 36>,
+    #[plucker(GpioPin<Unknown, 0>, map={ let mut res = _pin_gnd.into_push_pull_output(); res.set_low().unwrap(); res })]
+    _pin_gnd: GpioPin<Output<PushPull>, 0>,
+    #[list_build_ignore]
     prev_state: bool,
+    #[list_build_ignore]
     scroll_val: i8,
 }
 
 impl WheelEncoder {
-    fn new() -> Self {
-        Self {
-            value: 0,
-            state: true,
-            prev_state: true,
-            scroll_val: 0,
-        }
-    }
     fn read_encoder(
         &mut self,
-        enc_a: &mut dyn InputPin<Error = Infallible>,
-        enc_b: &mut dyn InputPin<Error = Infallible>,
     ) -> Option<KeyCode> {
-        self.state = enc_a.is_high().unwrap();
+        self.state = self.pin_a.is_high().unwrap();
         let res = if self.state == self.prev_state {
             None
         } else {
-            let scroll = if enc_b.is_high().unwrap() == self.state {
+            let scroll = if self.pin_b.is_high().unwrap() == self.state {
                 self.value -= 1;
                 self.scroll_val = -1;
                 KeyCode::MediaScrollDown
