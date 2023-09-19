@@ -127,12 +127,12 @@ fn main() -> ! {
     };
     let mut left_finger = KeyDriver::new(left_finger, 5, Delay::new(&clocks));
 
-    let pin_a = &io.pins.gpio35.into_pull_up_input();
-    let pin_b = &io.pins.gpio36.into_pull_up_input();
+    let pin_a = io.pins.gpio35.into_pull_up_input();
+    let pin_b = io.pins.gpio36.into_pull_up_input();
     let gnd = io.pins.gpio0.into_push_pull_output();
     let wheel_pins = hardware::wheel::UninitWheelPins {
-        pin_a,
-        pin_b,
+        in1: pin_a,
+        in2: pin_b,
         gnd: Some(gnd),
     };
     let mut wheel = MouseWheelDriver::new(wheel_pins);

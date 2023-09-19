@@ -4,25 +4,25 @@ use embedded_hal::digital::v2::{InputPin, OutputPin};
 use esp_backtrace as _;
 use keyberon::key_code::KeyCode;
 
-pub struct UninitWheelPins<'a, I1, I2, O>
+pub struct UninitWheelPins<I1, I2, O>
 where
     I1: InputPin<Error = Infallible>,
     I2: InputPin<Error = Infallible>,
     O: OutputPin<Error = Infallible>,
 {
-    pub pin_a: &'a I1,
-    pub pin_b: &'a I2,
+    pub in1: I1,
+    pub in2: I2,
     pub gnd: Option<O>,
 }
 
-impl<'a, I1, I2, O> UninitWheelPins<'a, I1, I2, O>
+impl<I1, I2, O> UninitWheelPins<I1, I2, O>
 where
     I1: InputPin<Error = Infallible>,
     I2: InputPin<Error = Infallible>,
     O: OutputPin<Error = Infallible>,
 {
-    fn init(self) -> InitedWheelPins<'a, I1, I2, O> {
-        let Self { pin_a, pin_b, gnd } = self;
+    fn init(self) -> InitedWheelPins<I1, I2, O> {
+        let Self { in1: pin_a, in2: pin_b, gnd } = self;
 
         let _gnd = gnd.map(|mut g| {
             g.set_low().unwrap();
@@ -32,37 +32,37 @@ where
     }
 }
 
-pub struct InitedWheelPins<'a, I1, I2, O>
+pub struct InitedWheelPins<I1, I2, O>
 where
     I1: InputPin<Error = Infallible>,
     I2: InputPin<Error = Infallible>,
     O: OutputPin<Error = Infallible>,
 {
-    in1: &'a I1,
-    in2: &'a I2,
+    in1: I1,
+    in2: I2,
     _gnd: Option<O>,
 }
 
-pub struct MouseWheelDriver<'a, I1, I2, O>
+pub struct MouseWheelDriver<I1, I2, O>
 where
     I1: InputPin<Error = Infallible>,
     I2: InputPin<Error = Infallible>,
     O: OutputPin<Error = Infallible>,
 {
-    pins: InitedWheelPins<'a, I1, I2, O>,
+    pins: InitedWheelPins<I1, I2, O>,
     value: u8,
     state: bool,
     prev_state: bool,
     scroll_val: i8,
 }
 
-impl<'a, I1, I2, O> MouseWheelDriver<'a, I1, I2, O>
+impl<I1, I2, O> MouseWheelDriver<I1, I2, O>
 where
     I1: InputPin<Error = Infallible>,
     I2: InputPin<Error = Infallible>,
     O: OutputPin<Error = Infallible>,
 {
-    pub fn new(pins: UninitWheelPins<'a, I1, I2, O>) -> Self {
+    pub fn new(pins: UninitWheelPins<I1, I2, O>) -> Self {
         let pins = pins.init();
         Self {
             pins,
@@ -77,7 +77,7 @@ where
 pub trait Scroller {
     fn read_scroll(&mut self) -> Option<KeyCode>;
 }
-impl<'a, I1: InputPin<Error = Infallible>, I2: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Scroller for MouseWheelDriver<'a, I1, I2, O> {
+impl<I1: InputPin<Error = Infallible>, I2: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Scroller for MouseWheelDriver<I1, I2, O> {
     fn read_scroll(&mut self) -> Option<KeyCode> {
         self.state = self.pins.in1.is_high().unwrap();
         let res = if self.state == self.prev_state {
