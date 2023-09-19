@@ -111,18 +111,18 @@ fn main() -> ! {
 
     let left_finger = UninitKeyPins {
         ins: [
-            &io.pins.gpio21.into_pull_up_input(),
-            &io.pins.gpio47.into_pull_up_input(),
-            &io.pins.gpio48.into_pull_up_input(),
-            &io.pins.gpio45.into_pull_up_input(),
+            io.pins.gpio21.into_pull_up_input().degrade(),
+            io.pins.gpio47.into_pull_up_input().degrade(),
+            io.pins.gpio48.into_pull_up_input().degrade(),
+            io.pins.gpio45.into_pull_up_input().degrade(),
         ],
         outs: [
-            &mut io.pins.gpio42.into_push_pull_output(),
-            &mut io.pins.gpio41.into_push_pull_output(),
-            &mut io.pins.gpio40.into_push_pull_output(),
-            &mut io.pins.gpio39.into_push_pull_output(),
-            &mut io.pins.gpio38.into_push_pull_output(),
-            &mut io.pins.gpio37.into_push_pull_output(),
+            io.pins.gpio42.into_push_pull_output().degrade(),
+            io.pins.gpio41.into_push_pull_output().degrade(),
+            io.pins.gpio40.into_push_pull_output().degrade(),
+            io.pins.gpio39.into_push_pull_output().degrade(),
+            io.pins.gpio38.into_push_pull_output().degrade(),
+            io.pins.gpio37.into_push_pull_output().degrade(),
         ],
     };
     let mut left_finger = KeyDriver::new(left_finger, 5, Delay::new(&clocks));
