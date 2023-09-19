@@ -26,7 +26,6 @@ use usbd_human_interface_device::device::{
 use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
 
-
 use crate::hardware::matrix::{KeyDriver, UninitKeyPins};
 use crate::hardware::wheel::MouseWheelDriver;
 
@@ -126,7 +125,7 @@ fn main() -> ! {
             &mut io.pins.gpio37.into_push_pull_output(),
         ],
     };
-    let mut left_finger = KeyDriver::new(left_finger, 5);
+    let mut left_finger = KeyDriver::new(left_finger, 5, Delay::new(&clocks));
 
     let pin_a = &io.pins.gpio35.into_pull_up_input();
     let pin_b = &io.pins.gpio36.into_pull_up_input();
@@ -140,7 +139,7 @@ fn main() -> ! {
     loop {
         let scroll = wheel.read_encoder();
         delay.delay_us(300u32);
-        let report = left_finger.key_scan(&mut delay);
+        let report = left_finger.key_scan();
         let events = left_finger
             .debouncer
             .events(report, Some(keyberon::debounce::transpose));
