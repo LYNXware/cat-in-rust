@@ -27,7 +27,7 @@ use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
 
 use crate::hardware::matrix::{KeyDriver, UninitKeyPins};
-use crate::hardware::wheel::MouseWheelDriver;
+use crate::hardware::wheel::{MouseWheelDriver, Scroller};
 
 mod board_modules;
 mod hardware;
@@ -141,7 +141,7 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
     loop {
-        let scroll = wheel.read_encoder();
+        let scroll = wheel.read_scroll();
         delay.delay_us(300u32);
         let report = left_finger.key_scan();
         let events = left_finger

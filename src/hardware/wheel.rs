@@ -28,7 +28,7 @@ where
             g.set_low().unwrap();
             g
         });
-        InitedWheelPins { pin_a, pin_b, _gnd }
+        InitedWheelPins { in1: pin_a, in2: pin_b, _gnd }
     }
 }
 
@@ -38,8 +38,8 @@ where
     I2: InputPin<Error = Infallible>,
     O: OutputPin<Error = Infallible>,
 {
-    pin_a: &'a I1,
-    pin_b: &'a I2,
+    in1: &'a I1,
+    in2: &'a I2,
     _gnd: Option<O>,
 }
 
@@ -72,12 +72,18 @@ where
             scroll_val: 0,
         }
     }
-    pub fn read_encoder(&mut self) -> Option<KeyCode> {
-        self.state = self.pins.pin_a.is_high().unwrap();
+}
+
+pub trait Scroller {
+    fn read_scroll(&mut self) -> Option<KeyCode>;
+}
+impl<'a, I1: InputPin<Error = Infallible>, I2: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Scroller for MouseWheelDriver<'a, I1, I2, O> {
+    fn read_scroll(&mut self) -> Option<KeyCode> {
+        self.state = self.pins.in1.is_high().unwrap();
         let res = if self.state == self.prev_state {
             None
         } else {
-            let scroll = if self.pins.pin_b.is_high().unwrap() == self.state {
+            let scroll = if self.pins.in2.is_high().unwrap() == self.state {
                 self.value -= 1;
                 self.scroll_val = -1;
                 KeyCode::MediaScrollDown
