@@ -97,6 +97,7 @@ dependencies = [
  "esp-backtrace",
  "esp-println",
  "esp32s3-hal",
+ "fugit",
  "generic-array",
  "heapless",
  "keyberon",
