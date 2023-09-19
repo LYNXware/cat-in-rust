@@ -12,7 +12,7 @@ where
 {
     pub pin_a: &'a I1,
     pub pin_b: &'a I2,
-    pub gnd: &'a mut O,
+    pub gnd: Option<O>,
 }
 
 impl<'a, I1, I2, O> UninitWheelPins<'a, I1, I2, O>
@@ -22,12 +22,13 @@ where
     O: OutputPin<Error = Infallible>,
 {
     fn init(self) -> InitedWheelPins<'a, I1, I2, O> {
-        let _ = self.gnd.set_low();
-        InitedWheelPins {
-            pin_a: self.pin_a,
-            pin_b: self.pin_b,
-            _gnd: self.gnd,
-        }
+        let Self { pin_a, pin_b, gnd } = self;
+
+        let _gnd = gnd.map(|mut g| {
+            g.set_low().unwrap();
+            g
+        });
+        InitedWheelPins { pin_a, pin_b, _gnd }
     }
 }
 
@@ -39,7 +40,7 @@ where
 {
     pin_a: &'a I1,
     pin_b: &'a I2,
-    _gnd: &'a O,
+    _gnd: Option<O>,
 }
 
 pub struct MouseWheelDriver<'a, I1, I2, O>

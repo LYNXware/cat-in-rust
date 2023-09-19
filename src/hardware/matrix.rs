@@ -62,7 +62,7 @@ impl<InP: InputPin, OutP: OutputPin, const InN: usize, const OutN: usize, D: Del
     }
 
     // pub fn reset_with_new_tolerance(&mut self, n: u16) {
-    //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n) 
+    //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
     // }
 }
 
