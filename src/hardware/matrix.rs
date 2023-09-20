@@ -5,7 +5,11 @@ use embedded_hal::{
     digital::v2::{InputPin, OutputPin},
 };
 
-use keyberon::{debounce::Debouncer, layout::{Layout, Layers}, key_code::KeyCode};
+use keyberon::{
+    debounce::Debouncer,
+    key_code::KeyCode,
+    layout::{Layers, Layout},
+};
 use usbd_human_interface_device::{device::keyboard::BootKeyboard, page::Keyboard as HidKeyboard};
 
 /// Pin container in uninitialized form
@@ -68,23 +72,23 @@ impl<InP: InputPin, OutP: OutputPin, const InN: usize, const OutN: usize, D: Del
     }
 
     /// key up/down events
-    pub fn events(&mut self) -> impl Iterator<Item = HidKeyboard> + '_  {
-            let report = self.key_scan();
-            let events = self
-                .debouncer
-                .events(report, Some(keyberon::debounce::transpose));
-            for ev in events {
-                self.layout.event(ev);
-            }
-            self.layout.tick();
-            let ron_report = self.layout.keycodes();
-            let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
+    pub fn events(&mut self) -> impl Iterator<Item = HidKeyboard> + '_ {
+        self.layout.tick();
+        let report = self.key_scan();
+        let events = self
+            .debouncer
+            .events(report, Some(keyberon::debounce::transpose));
+        for ev in events {
+            self.layout.event(ev);
+        }
+        let ron_report = self.layout.keycodes();
+        let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
 
-            hid_report
+        hid_report
     }
-        // pub fn reset_with_new_tolerance(&mut self, n: u16) {
-        //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
-        // }
+    // pub fn reset_with_new_tolerance(&mut self, n: u16) {
+    //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
+    // }
 }
 
 #[allow(non_upper_case_globals)]
@@ -121,4 +125,3 @@ impl<InP: InputPin, OutP: OutputPin, const InN: usize, const OutN: usize>
         res
     }
 }
-
