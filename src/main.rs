@@ -38,7 +38,6 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
-
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let uart_vdd_pin = io.pins.gpio11;
     let mut uart_vdd_pin = uart_vdd_pin.into_push_pull_output();

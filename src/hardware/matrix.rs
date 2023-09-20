@@ -10,7 +10,7 @@ use keyberon::{
     key_code::KeyCode,
     layout::{Layers, Layout},
 };
-use usbd_human_interface_device::{device::keyboard::BootKeyboard, page::Keyboard as HidKeyboard};
+use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 
 /// Pin container in uninitialized form
 #[allow(non_upper_case_globals)]
@@ -82,10 +82,9 @@ impl<InP: InputPin, OutP: OutputPin, const InN: usize, const OutN: usize, D: Del
             self.layout.event(ev);
         }
         let ron_report = self.layout.keycodes();
-        let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
-
-        hid_report
+        ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from)
     }
+
     // pub fn reset_with_new_tolerance(&mut self, n: u16) {
     //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
     // }
