@@ -5,7 +5,8 @@ use embedded_hal::{
     digital::v2::{InputPin, OutputPin},
 };
 
-use keyberon::debounce::Debouncer;
+use keyberon::{debounce::Debouncer, layout::{Layout, Layers}, key_code::KeyCode};
+use usbd_human_interface_device::{device::keyboard::BootKeyboard, page::Keyboard as HidKeyboard};
 
 /// Pin container in uninitialized form
 #[allow(non_upper_case_globals)]
@@ -33,6 +34,10 @@ pub struct KeyDriver<
     matrix: InitedKeyPins<InP, OutP, InN, OutN>,
     pub debouncer: Debouncer<[[bool; InN]; OutN]>,
     delayer: D,
+    // TODO: change layout count dynamically (and upstream changes?)
+    // ...this would be for OTA updates from desk top configuring the layouts
+    // ...don't couple the ins and outs to col/row.
+    layout: Layout<OutN, InN, 1>,
 }
 
 #[allow(non_upper_case_globals)]
@@ -43,17 +48,18 @@ impl<InP: InputPin, OutP: OutputPin, const InN: usize, const OutN: usize, D: Del
         matrix: UninitKeyPins<InP, OutP, InN, OutN>,
         debounce_tolerance: u16,
         delayer: D,
+        layers: &'static Layers<OutN, InN, 1>,
     ) -> Self {
         let matrix = matrix.init();
         Self {
             matrix,
             debouncer: Self::gen_debouncer(debounce_tolerance),
             delayer,
+            layout: Layout::new(layers),
         }
     }
 
-    /// Provides a matrix of pressed-down keys
-    pub fn key_scan(&mut self) -> [[bool; InN]; OutN] {
+    fn key_scan(&mut self) -> [[bool; InN]; OutN] {
         self.matrix.key_scan(&mut self.delayer)
     }
 
@@ -61,9 +67,24 @@ impl<InP: InputPin, OutP: OutputPin, const InN: usize, const OutN: usize, D: Del
         Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
     }
 
-    // pub fn reset_with_new_tolerance(&mut self, n: u16) {
-    //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
-    // }
+    /// key up/down events
+    pub fn events(&mut self) -> impl Iterator<Item = HidKeyboard> + '_  {
+            let report = self.key_scan();
+            let events = self
+                .debouncer
+                .events(report, Some(keyberon::debounce::transpose));
+            for ev in events {
+                self.layout.event(ev);
+            }
+            self.layout.tick();
+            let ron_report = self.layout.keycodes();
+            let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
+
+            hid_report
+    }
+        // pub fn reset_with_new_tolerance(&mut self, n: u16) {
+        //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
+        // }
 }
 
 #[allow(non_upper_case_globals)]
@@ -100,3 +121,4 @@ impl<InP: InputPin, OutP: OutputPin, const InN: usize, const OutN: usize>
         res
     }
 }
+

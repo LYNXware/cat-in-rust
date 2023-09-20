@@ -15,7 +15,6 @@ use hal::{
 };
 use hal::{prelude::*, Delay};
 use keyberon::key_code::KeyCode;
-use keyberon::layout::Layout;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::mouse::{WheelMouse, WheelMouseReport};
@@ -23,7 +22,6 @@ use usbd_human_interface_device::device::{
     keyboard::{BootKeyboard, BootKeyboardConfig},
     mouse::WheelMouseConfig,
 };
-use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
 
 use crate::hardware::matrix::{KeyDriver, UninitKeyPins};
@@ -125,7 +123,8 @@ fn main() -> ! {
             io.pins.gpio37.into_push_pull_output().degrade(),
         ],
     };
-    let mut left_finger = KeyDriver::new(left_finger, 5, Delay::new(&clocks));
+
+    let mut left_finger = KeyDriver::new(left_finger, 5, Delay::new(&clocks), &board_modules::left_finger::LAYERS);
 
     let pin_a = io.pins.gpio35.into_pull_up_input();
     let pin_b = io.pins.gpio36.into_pull_up_input();
@@ -137,25 +136,14 @@ fn main() -> ! {
     };
     let mut wheel = MouseWheelDriver::new(wheel_pins);
 
-    let mut layout = Layout::new(&board_modules::left_finger::LAYERS);
-
     let mut delay = Delay::new(&clocks);
     loop {
         let scroll = wheel.read_scroll();
         delay.delay_us(300u32);
-        let report = left_finger.key_scan();
-        let events = left_finger
-            .debouncer
-            .events(report, Some(keyberon::debounce::transpose));
-        for ev in events {
-            layout.event(ev);
-        }
-        layout.tick();
-        let ron_report = layout.keycodes();
-        let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
+        let lf_report = left_finger.events();
 
         let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
-        match keyboard.write_report(hid_report) {
+        match keyboard.write_report(lf_report) {
             Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
             Err(e) => {
                 core::panic!("Failed to write keyboard report: {:?}", e)
