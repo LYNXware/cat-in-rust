@@ -9,15 +9,13 @@ use hal::otg_fs::{UsbBus, USB};
 use hal::{
     clock::ClockControl,
     peripherals::Peripherals,
-    timer::TimerGroup,
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
-    Rtc, IO,
+    IO,
 };
 use hal::{prelude::*, Delay};
-use keyberon::key_code::KeyCode;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
-use usbd_human_interface_device::device::mouse::{WheelMouse, WheelMouseReport};
+// use usbd_human_interface_device::device::mouse::{WheelMouse, WheelMouseReport};
 use usbd_human_interface_device::device::{
     keyboard::{BootKeyboard, BootKeyboardConfig},
     mouse::WheelMouseConfig,
@@ -25,7 +23,7 @@ use usbd_human_interface_device::device::{
 use usbd_human_interface_device::prelude::*;
 
 use crate::hardware::matrix::{KeyDriver, UninitKeyPins};
-use crate::hardware::wheel::{MouseWheelDriver, Scroller};
+// use crate::hardware::wheel::{MouseWheelDriver, Scroller};
 
 mod board_modules;
 mod hardware;
@@ -34,41 +32,12 @@ static mut USB_MEM: [u32; 1024] = [0; 1024];
 
 #[entry]
 fn main() -> ! {
-    init_logger(log::LevelFilter::Info);
+    init_logger(log::LevelFilter::Off);
     log::trace!("entered main, logging initialized");
     let peripherals = Peripherals::take();
-    log::trace!("Peripherals claimed");
     let mut system = peripherals.SYSTEM.split();
-    log::trace!("System components claimed");
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
-    log::trace!("clocks claimed with boot-defaultes, and frozen");
-    log::info!("Board resources claimed: peripherals, system, clocks");
 
-    // Disable the RTC and TIMG watchdog timers
-    let mut rtc = Rtc::new(peripherals.RTC_CNTL);
-    log::trace!("Rtc claimed");
-    let timer_group0 = TimerGroup::new(
-        peripherals.TIMG0,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    log::trace!("TimerGroup0 created");
-    let mut wdt0 = timer_group0.wdt;
-    let timer_group1 = TimerGroup::new(
-        peripherals.TIMG1,
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
-    log::trace!("TimerGroup1 created");
-    let mut wdt1 = timer_group1.wdt;
-    rtc.rwdt.disable();
-
-    log::trace!("\t rtc.rwdt.disable()");
-    wdt0.disable();
-    log::trace!("\t wdt0.disable()");
-    wdt1.disable();
-    log::trace!("\t wdt1.disable()");
-    log::info!("clocks configured: rtc-wdt, wdt0/1 disabled");
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let uart_vdd_pin = io.pins.gpio11;
