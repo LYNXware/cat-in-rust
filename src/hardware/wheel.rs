@@ -22,13 +22,21 @@ where
     O: OutputPin<Error = Infallible>,
 {
     fn init(self) -> InitedWheelPins<I1, I2, O> {
-        let Self { in1: pin_a, in2: pin_b, gnd } = self;
+        let Self {
+            in1: pin_a,
+            in2: pin_b,
+            gnd,
+        } = self;
 
         let _gnd = gnd.map(|mut g| {
             g.set_low().unwrap();
             g
         });
-        InitedWheelPins { in1: pin_a, in2: pin_b, _gnd }
+        InitedWheelPins {
+            in1: pin_a,
+            in2: pin_b,
+            _gnd,
+        }
     }
 }
 
@@ -77,7 +85,12 @@ where
 pub trait Scroller {
     fn read_scroll(&mut self) -> Option<KeyCode>;
 }
-impl<I1: InputPin<Error = Infallible>, I2: InputPin<Error = Infallible>, O: OutputPin<Error = Infallible>> Scroller for MouseWheelDriver<I1, I2, O> {
+impl<
+        I1: InputPin<Error = Infallible>,
+        I2: InputPin<Error = Infallible>,
+        O: OutputPin<Error = Infallible>,
+    > Scroller for MouseWheelDriver<I1, I2, O>
+{
     fn read_scroll(&mut self) -> Option<KeyCode> {
         self.state = self.pins.in1.is_high().unwrap();
         let res = if self.state == self.prev_state {
