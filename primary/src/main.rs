@@ -15,15 +15,17 @@ use hal::{
 use hal::{prelude::*, Delay};
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
-// use usbd_human_interface_device::device::mouse::{WheelMouse, WheelMouseReport};
 use usbd_human_interface_device::device::{
     keyboard::{BootKeyboard, BootKeyboardConfig},
     mouse::WheelMouseConfig,
 };
 use usbd_human_interface_device::prelude::*;
+// imports for wheel mouse. implied TODO, of course
+// use keyberon::key_code::KeyCode;
+// use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
+// use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
 
 use components::matrix::{KeyDriver, UninitKeyPins};
-// use crate::hardware::wheel::{MouseWheelDriver, Scroller};
 
 mod board_modules;
 mod hardware;
@@ -122,10 +124,11 @@ fn main() -> ! {
         &board_modules::left_thumb::LAYERS,
     );
 
-    // let pin_a = io.pins.gpio35.into_pull_up_input();
-    // let pin_b = io.pins.gpio36.into_pull_up_input();
+    // pin place-holders for now. refer to wiring diagram for correction
+    // let pin_a = io.pins.gpio43.into_pull_up_input();
+    // let pin_b = io.pins.gpio45.into_pull_up_input();
     // let gnd = io.pins.gpio0.into_push_pull_output();
-    // let wheel_pins = hardware::wheel::UninitWheelPins {
+    // let wheel_pins = UninitWheelPins {
     //     in1: pin_a,
     //     in2: pin_b,
     //     gnd: Some(gnd),
