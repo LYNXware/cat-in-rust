@@ -1,6 +1,4 @@
-//! Platform-agnostic implementation to init and read a keyboard matrix
-
-use embedded_hal::{
+use hal::{
     blocking::delay::DelayUs,
     digital::v2::{InputPin, OutputPin},
 };

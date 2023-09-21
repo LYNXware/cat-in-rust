@@ -1,7 +1,6 @@
 use core::convert::Infallible;
 
-use embedded_hal::digital::v2::{InputPin, OutputPin};
-use esp_backtrace as _;
+use hal::digital::v2::{InputPin, OutputPin};
 use keyberon::key_code::KeyCode;
 
 pub struct UninitWheelPins<I1, I2, O>

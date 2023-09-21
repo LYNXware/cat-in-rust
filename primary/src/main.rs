@@ -2,30 +2,30 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal::digital::v2::OutputPin;
 use esp_backtrace as _;
-use esp_println::logger::init_logger;
-use hal::otg_fs::{UsbBus, USB};
-use hal::{
+use esp_hal::otg_fs::{UsbBus, USB};
+use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
     IO,
 };
-use hal::{prelude::*, Delay};
+use esp_hal::{prelude::*, Delay};
+use esp_println::logger::init_logger;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
-// use usbd_human_interface_device::device::mouse::{WheelMouse, WheelMouseReport};
 use usbd_human_interface_device::device::{
     keyboard::{BootKeyboard, BootKeyboardConfig},
     mouse::WheelMouseConfig,
 };
 use usbd_human_interface_device::prelude::*;
+// imports for wheel mouse. implied TODO, of course
+// use keyberon::key_code::KeyCode;
+// use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
+// use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
 
-use crate::hardware::matrix::{KeyDriver, UninitKeyPins};
-// use crate::hardware::wheel::{MouseWheelDriver, Scroller};
+use components::matrix::{KeyDriver, UninitKeyPins};
 
-mod board_modules;
 mod hardware;
 
 static mut USB_MEM: [u32; 1024] = [0; 1024];
@@ -39,6 +39,8 @@ fn main() -> ! {
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    // uart setup
     let uart_vdd_pin = io.pins.gpio11;
     let mut uart_vdd_pin = uart_vdd_pin.into_push_pull_output();
     uart_vdd_pin.set_high().unwrap();
@@ -55,8 +57,6 @@ fn main() -> ! {
         &clocks,
         &mut system.peripheral_clock_control,
     );
-
-    log::info!("uart-setup: gnd: gnd, tx: 44, rx: 43, pwr: 1");
 
     let usb = USB::new(
         peripherals.USB0,
@@ -100,7 +100,7 @@ fn main() -> ! {
         left_finger,
         5,
         Delay::new(&clocks),
-        &board_modules::left_finger::LAYERS,
+        &configs::left_finger::LAYERS,
     );
     let left_thumb = UninitKeyPins {
         ins: [
@@ -119,13 +119,14 @@ fn main() -> ! {
         left_thumb,
         5,
         Delay::new(&clocks),
-        &board_modules::left_thumb::LAYERS,
+        &configs::left_thumb::LAYERS,
     );
 
-    // let pin_a = io.pins.gpio35.into_pull_up_input();
-    // let pin_b = io.pins.gpio36.into_pull_up_input();
+    // pin place-holders for now. refer to wiring diagram for correction
+    // let pin_a = io.pins.gpio43.into_pull_up_input();
+    // let pin_b = io.pins.gpio45.into_pull_up_input();
     // let gnd = io.pins.gpio0.into_push_pull_output();
-    // let wheel_pins = hardware::wheel::UninitWheelPins {
+    // let wheel_pins = UninitWheelPins {
     //     in1: pin_a,
     //     in2: pin_b,
     //     gnd: Some(gnd),
