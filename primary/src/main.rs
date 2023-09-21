@@ -2,7 +2,6 @@
 #![no_std]
 #![no_main]
 
-
 use embedded_hal::digital::v2::OutputPin;
 use esp_backtrace as _;
 use esp_println::logger::init_logger;
@@ -59,7 +58,6 @@ fn main() -> ! {
         &clocks,
         &mut system.peripheral_clock_control,
     );
-
 
     let usb = USB::new(
         peripherals.USB0,
