@@ -2,17 +2,16 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal::digital::v2::OutputPin;
 use esp_backtrace as _;
-use esp_println::logger::init_logger;
-use hal::otg_fs::{UsbBus, USB};
-use hal::{
+use esp_hal::otg_fs::{UsbBus, USB};
+use esp_hal::{
     clock::ClockControl,
     peripherals::Peripherals,
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
     IO,
 };
-use hal::{prelude::*, Delay};
+use esp_hal::{prelude::*, Delay};
+use esp_println::logger::init_logger;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::{

@@ -8,13 +8,12 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 components = {path = "../components/"}
 configs = {path = "../configs/"}
-hal = { package = "esp32s3-hal", version = "0.12.0" }
+esp_hal = { package = "esp32s3-hal", version = "0.12.0" }
 esp-backtrace = { version = "0.7.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-println       = { version = "0.5.0", features = ["esp32s3", "log"] }
 keyberon = {git = "https://github.com/Ben-PH/keyberon"}
 transpose = {git = "https://github.com/Ben-PH/transpose"}
 critical-section = "1.1.1"
-embedded-hal = "0.2.7"
 generic-array = "0.14.7"
 heapless = "0.7.16"
 log = "0.4.18"
