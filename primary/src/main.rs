@@ -22,7 +22,7 @@ use usbd_human_interface_device::device::{
 };
 use usbd_human_interface_device::prelude::*;
 
-use crate::hardware::matrix::{KeyDriver, UninitKeyPins};
+use components::matrix::{KeyDriver, UninitKeyPins};
 // use crate::hardware::wheel::{MouseWheelDriver, Scroller};
 
 mod board_modules;

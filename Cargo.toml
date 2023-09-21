@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "primary",
+    "components",
 ]
 
 resolver = "2"
