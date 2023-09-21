@@ -1,4 +1,4 @@
-use embedded_hal::{
+use hal::{
     blocking::delay::DelayUs,
     digital::v2::{InputPin, OutputPin},
 };
