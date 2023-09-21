@@ -112,6 +112,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "cat_esp32s3_rust_secondary"
+version = "0.1.0"
+dependencies = [
+ "components",
+ "configs",
+ "critical-section",
+ "esp-backtrace",
+ "esp-println",
+ "esp32s3-hal",
+ "fugit",
+ "generic-array",
+ "heapless",
+ "keyberon",
+ "log",
+ "num_enum 0.7.0",
+ "num_enum_derive 0.7.0",
+ "transpose",
+ "usb-device",
+ "usbd-hid",
+ "usbd-human-interface-device",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

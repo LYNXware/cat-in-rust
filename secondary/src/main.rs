@@ -3,10 +3,10 @@
 #![no_main]
 
 use esp_backtrace as _;
+use esp_hal::otg_fs::{UsbBus, USB};
 use esp_hal::{
     clock::ClockControl,
     efuse::Efuse,
-    otg_fs::{UsbBus, USB},
     peripherals::Peripherals,
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
     IO,
@@ -21,9 +21,9 @@ use usbd_human_interface_device::device::{
 };
 use usbd_human_interface_device::prelude::*;
 // imports for wheel mouse. implied TODO, of course
-// use keyberon::key_code::KeyCode;
-// use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
-// use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
+use keyberon::key_code::KeyCode;
+use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
+use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
 
 use components::matrix::{KeyDriver, UninitKeyPins};
 
@@ -80,7 +80,7 @@ fn main() -> ! {
         .device_class(3)
         .build();
 
-    let left_finger = UninitKeyPins {
+    let right_finger = UninitKeyPins {
         ins: [
             io.pins.gpio38.into_pull_up_input().degrade(),
             io.pins.gpio37.into_pull_up_input().degrade(),
@@ -98,13 +98,13 @@ fn main() -> ! {
         ],
     };
 
-    let mut left_finger = KeyDriver::new(
-        left_finger,
+    let mut right_finger = KeyDriver::new(
+        right_finger,
         5,
         Delay::new(&clocks),
-        &configs::left_finger::LAYERS,
+        &configs::right_finger::LAYERS,
     );
-    let left_thumb = UninitKeyPins {
+    let right_thumb = UninitKeyPins {
         ins: [
             io.pins.gpio17.into_pull_up_input().degrade(),
             io.pins.gpio16.into_pull_up_input().degrade(),
@@ -117,29 +117,29 @@ fn main() -> ! {
             io.pins.gpio6.into_push_pull_output().degrade(),
         ],
     };
-    let mut left_thumb = KeyDriver::new(
-        left_thumb,
+    let mut right_thumb = KeyDriver::new(
+        right_thumb,
         5,
         Delay::new(&clocks),
-        &configs::left_thumb::LAYERS,
+        &configs::right_thumb::LAYERS,
     );
 
     // pin place-holders for now. refer to wiring diagram for correction
-    // let pin_a = io.pins.gpio43.into_pull_up_input();
-    // let pin_b = io.pins.gpio45.into_pull_up_input();
-    // let gnd = io.pins.gpio0.into_push_pull_output();
-    // let wheel_pins = UninitWheelPins {
-    //     in1: pin_a,
-    //     in2: pin_b,
-    //     gnd: Some(gnd),
-    // };
-    // let mut wheel = MouseWheelDriver::new(wheel_pins);
+    let pin_a = io.pins.gpio45.into_pull_up_input();
+    let pin_b = io.pins.gpio48.into_pull_up_input();
+    let gnd = io.pins.gpio0.into_push_pull_output();
+    let wheel_pins = UninitWheelPins {
+        in1: pin_a,
+        in2: pin_b,
+        gnd: Some(gnd),
+    };
+    let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut delay = Delay::new(&clocks);
     loop {
-        // let scroll = wheel.read_scroll();
-        let lf_report = left_finger.events();
-        let kb_report = lf_report.chain(left_thumb.events());
+        let scroll = wheel.read_scroll();
+        let lf_report = right_finger.events();
+        let kb_report = lf_report.chain(right_thumb.events());
         let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
 
         match keyboard.write_report(kb_report) {
@@ -148,27 +148,27 @@ fn main() -> ! {
                 core::panic!("Failed to write keyboard report: {:?}", e)
             }
         };
-        // if let Some(scroll) = scroll {
-        //     let scroll = match scroll {
-        //         KeyCode::MediaScrollDown => 1,
-        //         KeyCode::MediaScrollUp => -1,
-        //         _ => panic!("this shouldn't happen"),
-        //     };
-        //     let mouse_report = WheelMouseReport {
-        //         buttons: 0,
-        //         x: 0,
-        //         y: 0,
-        //         vertical_wheel: scroll,
-        //         horizontal_wheel: 0,
-        //     };
-        //     let mouse = classes.device::<WheelMouse<'_, _>, _>();
-        //     match mouse.write_report(&mouse_report) {
-        //         Err(UsbHidError::WouldBlock) | Ok(_) => {}
-        //         Err(e) => {
-        //             core::panic!("Failed to write mouse report: {:?}", e)
-        //         }
-        //     };
-        // }
+        if let Some(scroll) = scroll {
+            let scroll = match scroll {
+                KeyCode::MediaScrollDown => 1,
+                KeyCode::MediaScrollUp => -1,
+                _ => panic!("this shouldn't happen"),
+            };
+            let mouse_report = WheelMouseReport {
+                buttons: 0,
+                x: 0,
+                y: 0,
+                vertical_wheel: scroll,
+                horizontal_wheel: 0,
+            };
+            let mouse = classes.device::<WheelMouse<'_, _>, _>();
+            match mouse.write_report(&mouse_report) {
+                Err(UsbHidError::WouldBlock) | Ok(_) => {}
+                Err(e) => {
+                    core::panic!("Failed to write mouse report: {:?}", e)
+                }
+            };
+        }
         delay.delay_us(300u32);
         usb_dev.poll(&mut [&mut classes]);
     }
