@@ -50,7 +50,9 @@ impl<'a, T: Instance> SpiMouseSensor<'a, T> {
         delayer.delay_us(50u32);
         Self { spi }
     }
-    fn read(&mut self) -> (u8, u8) {
+}
+impl components::mouse::PointerRead for SpiMouseSensor {
+    fn pointer_read(&mut self) -> components::mouse::DyDx {
             let dy = {
                 self.spi.send(DY).expect("todo");
                 self.spi.read().expect("todo")
@@ -59,6 +61,6 @@ impl<'a, T: Instance> SpiMouseSensor<'a, T> {
                 self.spi.send(DX).expect("todo");
                 self.spi.read().expect("todo")
             };
-            (dy, dx)
+            DyDx {dy, dx}
     }
 }
