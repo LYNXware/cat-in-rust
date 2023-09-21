@@ -2,6 +2,7 @@
 members = [
     "primary",
     "components",
+    "configs",
 ]
 
 resolver = "2"

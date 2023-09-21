@@ -93,6 +93,7 @@ name = "cat_esp32s3_rust"
 version = "0.1.0"
 dependencies = [
  "components",
+ "configs",
  "critical-section",
  "embedded-hal",
  "esp-backtrace",
@@ -125,6 +126,14 @@ dependencies = [
  "keyberon",
  "transpose",
  "usbd-human-interface-device",
+]
+
+[[package]]
+name = "configs"
+version = "0.1.0"
+dependencies = [
+ "keyberon",
+ "transpose",
 ]
 
 [[package]]

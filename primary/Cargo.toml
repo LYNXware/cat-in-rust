@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 components = {path = "../components/"}
+configs = {path = "../configs/"}
 hal = { package = "esp32s3-hal", version = "0.12.0" }
 esp-backtrace = { version = "0.7.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-println       = { version = "0.5.0", features = ["esp32s3", "log"] }
