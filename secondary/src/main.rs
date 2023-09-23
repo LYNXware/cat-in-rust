@@ -15,7 +15,10 @@ use esp_println::logger::init_logger;
 use esp_wifi::{esp_now::BROADCAST_ADDRESS, EspWifiInitFor};
 
 // imports for wheel mouse. implied TODO, of course
-use components::{mouse::{MouseWheelDriver, Scroller, UninitWheelPins}, ReadState};
+use components::{
+    mouse::{MouseWheelDriver, Scroller, UninitWheelPins},
+    ReadState,
+};
 use generic_array::GenericArray;
 use keyberon::key_code::KeyCode;
 
@@ -95,10 +98,7 @@ fn main() -> ! {
         ]),
     };
 
-    let mut right_finger = KeyDriver::new(
-        right_finger,
-        Delay::new(&clocks),
-    );
+    let mut right_finger = KeyDriver::new(right_finger, Delay::new(&clocks));
     let right_thumb = UninitKeyPins {
         ins: GenericArray::from_array([
             io.pins.gpio17.into_pull_up_input().degrade(),
@@ -112,10 +112,7 @@ fn main() -> ! {
             io.pins.gpio6.into_push_pull_output().degrade(),
         ]),
     };
-    let mut right_thumb = KeyDriver::new(
-        right_thumb,
-        Delay::new(&clocks),
-    );
+    let mut right_thumb = KeyDriver::new(right_thumb, Delay::new(&clocks));
 
     // pin place-holders for now. refer to wiring diagram for correction
     let pin_a = io.pins.gpio45.into_pull_up_input();

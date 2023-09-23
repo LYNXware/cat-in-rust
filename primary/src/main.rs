@@ -27,7 +27,10 @@ use usbd_human_interface_device::prelude::*;
 // use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
 // use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
 
-use components::{matrix::{KeyDriver, UninitKeyPins}, ReadState};
+use components::{
+    matrix::{KeyDriver, UninitKeyPins},
+    ReadState,
+};
 
 mod hardware;
 
@@ -116,12 +119,7 @@ fn main() -> ! {
         ]),
     };
 
-
-
-    let mut left_finger = KeyDriver::new(
-        left_finger,
-        Delay::new(&clocks),
-    );
+    let mut left_finger = KeyDriver::new(left_finger, Delay::new(&clocks));
     let left_thumb = UninitKeyPins {
         ins: GenericArray::from_array([
             io.pins.gpio17.into_pull_up_input().degrade(),
@@ -135,10 +133,7 @@ fn main() -> ! {
             io.pins.gpio6.into_push_pull_output().degrade(),
         ]),
     };
-    let mut left_thumb = KeyDriver::new(
-        left_thumb,
-        Delay::new(&clocks),
-    );
+    let mut left_thumb = KeyDriver::new(left_thumb, Delay::new(&clocks));
 
     // pin place-holders for now. refer to wiring diagram for correction
     // let pin_a = io.pins.gpio43.into_pull_up_input();

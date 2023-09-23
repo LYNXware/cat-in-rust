@@ -1,6 +1,6 @@
 #![no_std]
 
-use generic_array::{GenericArray, ArrayLength};
+use generic_array::{ArrayLength, GenericArray};
 pub mod matrix;
 pub mod mouse;
 

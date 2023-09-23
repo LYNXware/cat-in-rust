@@ -1,11 +1,11 @@
+use crate::ReadState;
 use core::ops::Mul;
 use hal::{
     blocking::delay::DelayUs,
     digital::v2::{InputPin, OutputPin},
 };
-use crate::ReadState;
 
-use generic_array::{ArrayLength, GenericArray };
+use generic_array::{ArrayLength, GenericArray};
 
 /// Pin container in uninitialized form
 #[allow(non_upper_case_globals)]
@@ -20,8 +20,6 @@ struct InitedKeyPins<InP: InputPin, OutP: OutputPin, InN: ArrayLength, OutN: Arr
     ins: GenericArray<InP, InN>,
     outs: GenericArray<OutP, OutN>,
 }
-
-
 
 /// Contains initialized pins, and metadata for kb-matrix usage
 #[allow(non_upper_case_globals)]
@@ -40,21 +38,21 @@ pub struct KeyDriver<
 impl<InP: InputPin, OutP: OutputPin, InN: ArrayLength, OutN: ArrayLength, D: DelayUs<u16>>
     KeyDriver<InP, OutP, InN, OutN, D>
 {
-    pub fn new(
-        matrix: UninitKeyPins<InP, OutP, InN, OutN>,
-        delayer: D,
-    ) -> Self {
+    pub fn new(matrix: UninitKeyPins<InP, OutP, InN, OutN>, delayer: D) -> Self {
         let matrix = matrix.init();
-        Self {
-            matrix,
-            delayer,
-        }
+        Self { matrix, delayer }
     }
 }
 
-impl<InP: InputPin, OutP: OutputPin, InN: ArrayLength + Mul<OutN>, OutN: ArrayLength, D: DelayUs<u16>>
-    ReadState for KeyDriver<InP, OutP, InN, OutN, D>
-    where <InN as Mul<OutN>>::Output: ArrayLength
+impl<
+        InP: InputPin,
+        OutP: OutputPin,
+        InN: ArrayLength + Mul<OutN>,
+        OutN: ArrayLength,
+        D: DelayUs<u16>,
+    > ReadState for KeyDriver<InP, OutP, InN, OutN, D>
+where
+    <InN as Mul<OutN>>::Output: ArrayLength,
 {
     type LEN = <InN as Mul<OutN>>::Output;
     fn read_state(&mut self, buf: &mut GenericArray<u8, Self::LEN>) {
@@ -79,7 +77,6 @@ impl<InP: InputPin, OutP: OutputPin, InN: ArrayLength, OutN: ArrayLength>
             outs: self.outs,
         }
     }
-
 }
 
 #[allow(non_upper_case_globals)]
@@ -89,7 +86,11 @@ impl<InP: InputPin, OutP: OutputPin, InN: ArrayLength, OutN: ArrayLength>
     /// The poll mechanism: For each output pins row/col, set to low. scan each input col/row to
     /// check if it follows the low-set
     /// TODO: constrain so that the there are 0..=7 extra bits.
-    fn read_state<LEN: ArrayLength>(&mut self, buf: &mut GenericArray<u8, LEN>, delayer: &mut impl DelayUs<u16>) {
+    fn read_state<LEN: ArrayLength>(
+        &mut self,
+        buf: &mut GenericArray<u8, LEN>,
+        delayer: &mut impl DelayUs<u16>,
+    ) {
         let pin_finder = |byte, bit| {
             let idx = byte * 8 + bit;
             let out_pin = idx / OutN::to_usize();
