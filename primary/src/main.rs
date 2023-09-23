@@ -14,6 +14,7 @@ use esp_hal::{
 use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
 use esp_wifi::EspWifiInitFor;
+use generic_array::GenericArray;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::{
@@ -26,7 +27,7 @@ use usbd_human_interface_device::prelude::*;
 // use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
 // use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
 
-use components::matrix::{KeyDriver, UninitKeyPins};
+use components::{matrix::{KeyDriver, UninitKeyPins}, ReadState};
 
 mod hardware;
 
@@ -98,13 +99,13 @@ fn main() -> ! {
     .unwrap();
     let (wifi, ..) = peripherals.RADIO.split();
     let left_finger = UninitKeyPins {
-        ins: [
+        ins: GenericArray::from_array([
             io.pins.gpio38.into_pull_up_input().degrade(),
             io.pins.gpio37.into_pull_up_input().degrade(),
             io.pins.gpio36.into_pull_up_input().degrade(),
             io.pins.gpio35.into_pull_up_input().degrade(),
-        ],
-        outs: [
+        ]),
+        outs: GenericArray::from_array([
             io.pins.gpio44.into_push_pull_output().degrade(),
             io.pins.gpio1.into_push_pull_output().degrade(),
             io.pins.gpio2.into_push_pull_output().degrade(),
@@ -112,33 +113,31 @@ fn main() -> ! {
             io.pins.gpio41.into_push_pull_output().degrade(),
             io.pins.gpio40.into_push_pull_output().degrade(),
             io.pins.gpio39.into_push_pull_output().degrade(),
-        ],
+        ]),
     };
+
+
 
     let mut left_finger = KeyDriver::new(
         left_finger,
-        5,
         Delay::new(&clocks),
-        &configs::left_finger::LAYERS,
     );
     let left_thumb = UninitKeyPins {
-        ins: [
+        ins: GenericArray::from_array([
             io.pins.gpio17.into_pull_up_input().degrade(),
             io.pins.gpio16.into_pull_up_input().degrade(),
             io.pins.gpio15.into_pull_up_input().degrade(),
             io.pins.gpio7.into_pull_up_input().degrade(),
-        ],
-        outs: [
+        ]),
+        outs: GenericArray::from_array([
             io.pins.gpio4.into_push_pull_output().degrade(),
             io.pins.gpio5.into_push_pull_output().degrade(),
             io.pins.gpio6.into_push_pull_output().degrade(),
-        ],
+        ]),
     };
     let mut left_thumb = KeyDriver::new(
         left_thumb,
-        5,
         Delay::new(&clocks),
-        &configs::left_thumb::LAYERS,
     );
 
     // pin place-holders for now. refer to wiring diagram for correction
@@ -153,21 +152,23 @@ fn main() -> ! {
     // let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut delay = Delay::new(&clocks);
-    log::info!("nowing");
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
-    log::info!("againning");
+    let mut lf_state = GenericArray::default();
+    let mut lt_state = GenericArray::default();
     loop {
         // let scroll = wheel.read_scroll();
-        let lf_report = left_finger.events();
-        let kb_report = lf_report.chain(left_thumb.events());
-        let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
+        left_finger.read_state(&mut lf_state);
+        left_thumb.read_state(&mut lt_state);
+        // TODO: check for state from secondary...
 
-        match keyboard.write_report(kb_report) {
-            Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
-            Err(e) => {
-                core::panic!("Failed to write keyboard report: {:?}", e)
-            }
-        };
+        // TODO: transform the state into a kb-report
+        let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
+        // match keyboard.write_report(kb_report) {
+        //     Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
+        //     Err(e) => {
+        //         core::panic!("Failed to write keyboard report: {:?}", e)
+        //     }
+        // };
         delay.delay_us(300u32);
         usb_dev.poll(&mut [&mut classes]);
     }

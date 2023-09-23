@@ -15,7 +15,8 @@ use esp_println::logger::init_logger;
 use esp_wifi::{esp_now::BROADCAST_ADDRESS, EspWifiInitFor};
 
 // imports for wheel mouse. implied TODO, of course
-use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
+use components::{mouse::{MouseWheelDriver, Scroller, UninitWheelPins}, ReadState};
+use generic_array::GenericArray;
 use keyberon::key_code::KeyCode;
 
 use components::matrix::{KeyDriver, UninitKeyPins};
@@ -77,13 +78,13 @@ fn main() -> ! {
     );
 
     let right_finger = UninitKeyPins {
-        ins: [
+        ins: GenericArray::from_array([
             io.pins.gpio38.into_pull_up_input().degrade(),
             io.pins.gpio37.into_pull_up_input().degrade(),
             io.pins.gpio36.into_pull_up_input().degrade(),
             io.pins.gpio35.into_pull_up_input().degrade(),
-        ],
-        outs: [
+        ]),
+        outs: GenericArray::from_array([
             io.pins.gpio44.into_push_pull_output().degrade(),
             io.pins.gpio1.into_push_pull_output().degrade(),
             io.pins.gpio2.into_push_pull_output().degrade(),
@@ -91,33 +92,29 @@ fn main() -> ! {
             io.pins.gpio41.into_push_pull_output().degrade(),
             io.pins.gpio40.into_push_pull_output().degrade(),
             io.pins.gpio39.into_push_pull_output().degrade(),
-        ],
+        ]),
     };
 
     let mut right_finger = KeyDriver::new(
         right_finger,
-        5,
         Delay::new(&clocks),
-        &configs::right_finger::LAYERS,
     );
     let right_thumb = UninitKeyPins {
-        ins: [
+        ins: GenericArray::from_array([
             io.pins.gpio17.into_pull_up_input().degrade(),
             io.pins.gpio16.into_pull_up_input().degrade(),
             io.pins.gpio15.into_pull_up_input().degrade(),
             io.pins.gpio7.into_pull_up_input().degrade(),
-        ],
-        outs: [
+        ]),
+        outs: GenericArray::from_array([
             io.pins.gpio4.into_push_pull_output().degrade(),
             io.pins.gpio5.into_push_pull_output().degrade(),
             io.pins.gpio6.into_push_pull_output().degrade(),
-        ],
+        ]),
     };
     let mut right_thumb = KeyDriver::new(
         right_thumb,
-        5,
         Delay::new(&clocks),
-        &configs::right_thumb::LAYERS,
     );
 
     // pin place-holders for now. refer to wiring diagram for correction
@@ -132,10 +129,12 @@ fn main() -> ! {
     let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut delay = Delay::new(&clocks);
+    let mut rf_state = GenericArray::default();
+    let mut rt_state = GenericArray::default();
     loop {
         let scroll = wheel.read_scroll();
-        let lf_report = right_finger.events();
-        let kb_report = lf_report.chain(right_thumb.events());
+        right_finger.read_state(&mut rf_state);
+        right_thumb.read_state(&mut rt_state);
 
         if let Some(scroll) = scroll {
             let scroll = match scroll {
