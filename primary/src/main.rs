@@ -9,10 +9,11 @@ use esp_hal::{
     otg_fs::{UsbBus, USB},
     peripherals::Peripherals,
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
-    IO,
+    Rng, IO,
 };
 use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
+use esp_wifi::EspWifiInitFor;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::{
@@ -37,7 +38,13 @@ fn main() -> ! {
     log::trace!("entered main, logging initialized");
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let clocks = ClockControl::max(system.clock_control).freeze();
+    let timer = esp_hal::timer::TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    )
+    .timer0;
     log::info!("MAC address {:02x?}", Efuse::get_mac_address());
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
@@ -79,7 +86,17 @@ fn main() -> ! {
         .product("totally not a malicious thing")
         .device_class(3)
         .build();
+    usb_dev.poll(&mut [&mut classes]);
 
+    let wifi_init = esp_wifi::initialize(
+        EspWifiInitFor::Wifi,
+        timer,
+        Rng::new(peripherals.RNG),
+        system.radio_clock_control,
+        &clocks,
+    )
+    .unwrap();
+    let (wifi, ..) = peripherals.RADIO.split();
     let left_finger = UninitKeyPins {
         ins: [
             io.pins.gpio38.into_pull_up_input().degrade(),
@@ -136,6 +153,9 @@ fn main() -> ! {
     // let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut delay = Delay::new(&clocks);
+    log::info!("nowing");
+    let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
+    log::info!("againning");
     loop {
         // let scroll = wheel.read_scroll();
         let lf_report = left_finger.events();
@@ -148,27 +168,6 @@ fn main() -> ! {
                 core::panic!("Failed to write keyboard report: {:?}", e)
             }
         };
-        // if let Some(scroll) = scroll {
-        //     let scroll = match scroll {
-        //         KeyCode::MediaScrollDown => 1,
-        //         KeyCode::MediaScrollUp => -1,
-        //         _ => panic!("this shouldn't happen"),
-        //     };
-        //     let mouse_report = WheelMouseReport {
-        //         buttons: 0,
-        //         x: 0,
-        //         y: 0,
-        //         vertical_wheel: scroll,
-        //         horizontal_wheel: 0,
-        //     };
-        //     let mouse = classes.device::<WheelMouse<'_, _>, _>();
-        //     match mouse.write_report(&mouse_report) {
-        //         Err(UsbHidError::WouldBlock) | Ok(_) => {}
-        //         Err(e) => {
-        //             core::panic!("Failed to write mouse report: {:?}", e)
-        //         }
-        //     };
-        // }
         delay.delay_us(300u32);
         usb_dev.poll(&mut [&mut classes]);
     }

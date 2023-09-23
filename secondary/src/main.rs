@@ -3,7 +3,6 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::otg_fs::{UsbBus, USB};
 use esp_hal::{
     clock::ClockControl,
     efuse::Efuse,
@@ -11,25 +10,25 @@ use esp_hal::{
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
     IO,
 };
-use esp_hal::{prelude::*, Delay};
+use esp_hal::{prelude::*, Delay, Rng};
 use esp_println::logger::init_logger;
-use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
+use esp_wifi::{esp_now::BROADCAST_ADDRESS, EspWifiInitFor};
 
-use usbd_human_interface_device::device::{
-    keyboard::{BootKeyboard, BootKeyboardConfig},
-    mouse::WheelMouseConfig,
-};
-use usbd_human_interface_device::prelude::*;
 // imports for wheel mouse. implied TODO, of course
-use keyberon::key_code::KeyCode;
-use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
 use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
+use keyberon::key_code::KeyCode;
 
 use components::matrix::{KeyDriver, UninitKeyPins};
 
 mod hardware;
 
-static mut USB_MEM: [u32; 1024] = [0; 1024];
+/* TODO: setup some sort of configuration-based hard-coding to set the primary.
+ *  - needs to be statically defined. Zero-runtime
+ *  - defined in such a way that works well with a git-repo
+ *  - one idea: write a tool that gets the MAC address of the primary/others, and generates a
+ *  config file (tson, toml, json, etc.) which a build.rs can use to compile-time define things
+*/
+static PRIMARY_ADDR: [u8; 6] = BROADCAST_ADDRESS;
 
 #[entry]
 fn main() -> ! {
@@ -39,6 +38,23 @@ fn main() -> ! {
     let mut system = peripherals.SYSTEM.split();
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     log::info!("MAC address {:02x?}", Efuse::get_mac_address());
+
+    let timer = esp_hal::timer::TimerGroup::new(
+        peripherals.TIMG1,
+        &clocks,
+        &mut system.peripheral_clock_control,
+    )
+    .timer0;
+    let wifi_init = esp_wifi::initialize(
+        EspWifiInitFor::Wifi,
+        timer,
+        Rng::new(peripherals.RNG),
+        system.radio_clock_control,
+        &clocks,
+    )
+    .unwrap();
+    let (wifi, ..) = peripherals.RADIO.split();
+    let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -59,26 +75,6 @@ fn main() -> ! {
         &clocks,
         &mut system.peripheral_clock_control,
     );
-
-    let usb = USB::new(
-        peripherals.USB0,
-        io.pins.gpio18,
-        io.pins.gpio19,
-        io.pins.gpio20,
-        &mut system.peripheral_clock_control,
-    );
-
-    let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
-    let mut classes = UsbHidClassBuilder::new()
-        .add_device(WheelMouseConfig::default())
-        .add_device(BootKeyboardConfig::default())
-        .build(&usb_bus);
-
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
-        .manufacturer("shady-bastard")
-        .product("totally not a malicious thing")
-        .device_class(3)
-        .build();
 
     let right_finger = UninitKeyPins {
         ins: [
@@ -140,36 +136,15 @@ fn main() -> ! {
         let scroll = wheel.read_scroll();
         let lf_report = right_finger.events();
         let kb_report = lf_report.chain(right_thumb.events());
-        let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
 
-        match keyboard.write_report(kb_report) {
-            Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
-            Err(e) => {
-                core::panic!("Failed to write keyboard report: {:?}", e)
-            }
-        };
         if let Some(scroll) = scroll {
             let scroll = match scroll {
                 KeyCode::MediaScrollDown => 1,
                 KeyCode::MediaScrollUp => -1,
                 _ => panic!("this shouldn't happen"),
             };
-            let mouse_report = WheelMouseReport {
-                buttons: 0,
-                x: 0,
-                y: 0,
-                vertical_wheel: scroll,
-                horizontal_wheel: 0,
-            };
-            let mouse = classes.device::<WheelMouse<'_, _>, _>();
-            match mouse.write_report(&mouse_report) {
-                Err(UsbHidError::WouldBlock) | Ok(_) => {}
-                Err(e) => {
-                    core::panic!("Failed to write mouse report: {:?}", e)
-                }
-            };
         }
         delay.delay_us(300u32);
-        usb_dev.poll(&mut [&mut classes]);
+        todo!("esp-now send the events");
     }
 }

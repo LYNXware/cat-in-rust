@@ -10,3 +10,12 @@ resolver = "2"
 
 [patch.crates-io]
 bitvec = {git = "https://github.com/alexanderkjall/bitvec.git", branch = "upgrade-radium-to-1"}
+
+
+[profile.dev.package.esp-wifi]
+opt-level = 3
+
+[profile.dev]
+lto = "off"
+[profile.release]
+lto = "off"
