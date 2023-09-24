@@ -150,16 +150,24 @@ fn main() -> ! {
     // };
     // let mut wheel = MouseWheelDriver::new(wheel_pins);
 
-    // let mut delay = Delay::new(&clocks);
-    // let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
+    let mut delay = Delay::new(&clocks);
+    let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
     // let secondary = PeerInfo{ peer_address: BROADCAST_ADDRESS, lmk: None, channel: None, encrypt: false };
-    // esp_now.add_peer(secondary).unwrap();
     let mut lf_state = GenericArray::default();
     // let mut lt_state = GenericArray::default();
     loop {
         // let scroll = wheel.read_scroll();
         left_finger.read_state(&mut lf_state);
-        log::info!("{:?}", &lf_state[0..((lf_matrix_len + 7) / 8)]);
+        let here_msg = &lf_state[0..((lf_matrix_len + 7) / 8)];
+        if here_msg.iter().any(|b| *b != 0) {
+            log::info!("{:?}", here_msg);
+        }
+        if let Some(rf) = esp_now.receive() {
+            let msg = &rf.data[0..(rf.len as usize)];
+            if msg.iter().any(|b| *b != 0) {
+                log::info!("{:?}", msg);
+            }
+        }
         // left_thumb.read_state(&mut lt_state);
         // TODO: check for state from secondary...
 
@@ -175,5 +183,6 @@ fn main() -> ! {
         //     log::info!("{:?}", &lf_rep.data[0..(lf_rep.len as usize)]);
         // }
         // usb_dev.poll(&mut [&mut classes]);
+        delay.delay_ms(1u32);
     }
 }

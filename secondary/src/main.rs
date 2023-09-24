@@ -62,14 +62,6 @@ fn main() -> ! {
     .unwrap();
     let (wifi, ..) = peripherals.RADIO.split();
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
-    esp_now
-        .add_peer(PeerInfo {
-            peer_address: BROADCAST_ADDRESS,
-            lmk: None,
-            channel: None,
-            encrypt: false,
-        })
-        .unwrap();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
