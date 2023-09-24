@@ -12,7 +12,10 @@ use esp_hal::{
 };
 use esp_hal::{prelude::*, Delay, Rng};
 use esp_println::logger::init_logger;
-use esp_wifi::{esp_now::BROADCAST_ADDRESS, EspWifiInitFor};
+use esp_wifi::{
+    esp_now::{PeerInfo, BROADCAST_ADDRESS},
+    EspWifiInitFor,
+};
 
 // imports for wheel mouse. implied TODO, of course
 use components::{
@@ -40,7 +43,7 @@ fn main() -> ! {
     log::trace!("entered main, logging initialized");
     let peripherals = Peripherals::take();
     let mut system = peripherals.SYSTEM.split();
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let clocks = ClockControl::max(system.clock_control).freeze();
     log::info!("MAC address {:02x?}", Efuse::get_mac_address());
 
     let timer = esp_hal::timer::TimerGroup::new(
@@ -59,6 +62,14 @@ fn main() -> ! {
     .unwrap();
     let (wifi, ..) = peripherals.RADIO.split();
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
+    esp_now
+        .add_peer(PeerInfo {
+            peer_address: BROADCAST_ADDRESS,
+            lmk: None,
+            channel: None,
+            encrypt: false,
+        })
+        .unwrap();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
 
@@ -88,7 +99,7 @@ fn main() -> ! {
             io.pins.gpio35.into_pull_up_input().degrade(),
         ]),
         outs: GenericArray::from_array([
-            io.pins.gpio44.into_push_pull_output().degrade(),
+            // io.pins.gpio44.into_push_pull_output().degrade(),
             io.pins.gpio1.into_push_pull_output().degrade(),
             io.pins.gpio2.into_push_pull_output().degrade(),
             io.pins.gpio42.into_push_pull_output().degrade(),
@@ -99,48 +110,55 @@ fn main() -> ! {
     };
 
     let mut right_finger = KeyDriver::new(right_finger, Delay::new(&clocks));
-    let right_thumb = UninitKeyPins {
-        ins: GenericArray::from_array([
-            io.pins.gpio17.into_pull_up_input().degrade(),
-            io.pins.gpio16.into_pull_up_input().degrade(),
-            io.pins.gpio15.into_pull_up_input().degrade(),
-            io.pins.gpio7.into_pull_up_input().degrade(),
-        ]),
-        outs: GenericArray::from_array([
-            io.pins.gpio4.into_push_pull_output().degrade(),
-            io.pins.gpio5.into_push_pull_output().degrade(),
-            io.pins.gpio6.into_push_pull_output().degrade(),
-        ]),
-    };
-    let mut right_thumb = KeyDriver::new(right_thumb, Delay::new(&clocks));
+    let rf_matrix_len = right_finger.bit_len();
+    // let right_thumb = UninitKeyPins {
+    //     ins: GenericArray::from_array([
+    //         io.pins.gpio17.into_pull_up_input().degrade(),
+    //         io.pins.gpio16.into_pull_up_input().degrade(),
+    //         io.pins.gpio15.into_pull_up_input().degrade(),
+    //         io.pins.gpio7.into_pull_up_input().degrade(),
+    //     ]),
+    //     outs: GenericArray::from_array([
+    //         io.pins.gpio4.into_push_pull_output().degrade(),
+    //         io.pins.gpio5.into_push_pull_output().degrade(),
+    //         io.pins.gpio6.into_push_pull_output().degrade(),
+    //     ]),
+    // };
+    // let mut right_thumb = KeyDriver::new(right_thumb, Delay::new(&clocks));
 
     // pin place-holders for now. refer to wiring diagram for correction
-    let pin_a = io.pins.gpio45.into_pull_up_input();
-    let pin_b = io.pins.gpio48.into_pull_up_input();
-    let gnd = io.pins.gpio0.into_push_pull_output();
-    let wheel_pins = UninitWheelPins {
-        in1: pin_a,
-        in2: pin_b,
-        gnd: Some(gnd),
-    };
-    let mut wheel = MouseWheelDriver::new(wheel_pins);
+    // let pin_a = io.pins.gpio45.into_pull_up_input();
+    // let pin_b = io.pins.gpio48.into_pull_up_input();
+    // let gnd = io.pins.gpio0.into_push_pull_output();
+    // let wheel_pins = UninitWheelPins {
+    //     in1: pin_a,
+    //     in2: pin_b,
+    //     gnd: Some(gnd),
+    // };
+    // let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut delay = Delay::new(&clocks);
     let mut rf_state = GenericArray::default();
-    let mut rt_state = GenericArray::default();
+    // let mut rt_state = GenericArray::default();
     loop {
-        let scroll = wheel.read_scroll();
+        // let scroll = wheel.read_scroll();
         right_finger.read_state(&mut rf_state);
-        right_thumb.read_state(&mut rt_state);
+        // right_thumb.read_state(&mut rt_state);
 
-        if let Some(scroll) = scroll {
-            let scroll = match scroll {
-                KeyCode::MediaScrollDown => 1,
-                KeyCode::MediaScrollUp => -1,
-                _ => panic!("this shouldn't happen"),
-            };
-        }
-        delay.delay_us(300u32);
-        todo!("esp-now send the events");
+        let _ = esp_now
+            .send(
+                &BROADCAST_ADDRESS,
+                &rf_state.as_slice()[0..((rf_matrix_len + 7) / 8)],
+            )
+            .unwrap();
+        // todo: drain pointer movement into esp-now
+        // if let Some(scroll) = scroll {
+        //     let scroll = match scroll {
+        //         KeyCode::MediaScrollDown => 1,
+        //         KeyCode::MediaScrollUp => -1,
+        //         _ => panic!("this shouldn't happen"),
+        //     };
+        // }
+        delay.delay_us(1000u32);
     }
 }

@@ -38,6 +38,9 @@ pub struct KeyDriver<
 impl<InP: InputPin, OutP: OutputPin, InN: ArrayLength, OutN: ArrayLength, D: DelayUs<u16>>
     KeyDriver<InP, OutP, InN, OutN, D>
 {
+    pub const fn bit_len(&self) -> usize {
+        InN::USIZE * OutN::USIZE
+    }
     pub fn new(matrix: UninitKeyPins<InP, OutP, InN, OutN>, delayer: D) -> Self {
         let matrix = matrix.init();
         Self { matrix, delayer }
@@ -54,14 +57,11 @@ impl<
 where
     <InN as Mul<OutN>>::Output: ArrayLength,
 {
+    // TODO: this is currently bit_len, but it bytes, not bits :(
     type LEN = <InN as Mul<OutN>>::Output;
     fn read_state(&mut self, buf: &mut GenericArray<u8, Self::LEN>) {
         self.matrix.read_state(buf, &mut self.delayer)
     }
-
-    // pub fn reset_with_new_tolerance(&mut self, n: u16) {
-    //     self.debouncer = Debouncer::new([[false; InN]; OutN], [[false; InN]; OutN], n)
-    // }
 }
 
 #[allow(non_upper_case_globals)]
@@ -91,26 +91,40 @@ impl<InP: InputPin, OutP: OutputPin, InN: ArrayLength, OutN: ArrayLength>
         buf: &mut GenericArray<u8, LEN>,
         delayer: &mut impl DelayUs<u16>,
     ) {
-        let pin_finder = |byte, bit| {
-            let idx = byte * 8 + bit;
-            let out_pin = idx / OutN::to_usize();
-            let in_pin = idx % InN::to_usize();
-            (out_pin, in_pin)
-        };
         let inner_buf = buf.as_mut_slice();
-        for (n, byte) in inner_buf.iter_mut().enumerate() {
+        let mut idx = 0;
+        for byte in inner_buf.iter_mut() {
+            // clear out previous state
+            *byte = 0;
             for bit in 0..8 {
-                let (out_pin, in_pin) = pin_finder(n, bit);
-                if in_pin == 0 {
-                    let _todo_logerr = self.outs[out_pin].set_low();
+                // might be some bits left over
+                if idx >= InN::to_usize() * OutN::to_usize() {
+                    return;
+                }
+
+                // outer-loop
+                let outputs_i = idx / InN::to_usize();
+                // inner-loop
+                let inputs_i = idx % InN::to_usize();
+
+                // each outer-loop is for the `outputs_i`th output-pin to be in a low-state, before
+                // returning back to a high-state
+                if inputs_i == 0 {
+                    let _todo_logerr = self.outs[outputs_i].set_low();
                     delayer.delay_us(5u16);
                 }
-                let val = self.ins[in_pin].is_low().unwrap_or_else(|_| panic!());
-                let mask = (val as u8) << bit;
-                *byte |= mask;
-                if in_pin == 0 {
-                    let _todo_logerr = self.outs[out_pin].set_high();
+
+                // the inner-loop is for each `inputs_i`th pin to test whether it is connected to
+                // the low-state `outputs_i`th pin, thus indicating if the switch is closed
+                let val = self.ins[inputs_i].is_low().unwrap_or_else(|_| panic!());
+                if val {
+                    let mask = 1 << bit;
+                    *byte |= mask;
                 }
+                if inputs_i + 1 == InN::to_usize() {
+                    let _todo_logerr = self.outs[outputs_i].set_high();
+                }
+                idx += 1;
             }
         }
     }

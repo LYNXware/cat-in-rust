@@ -13,7 +13,10 @@ use esp_hal::{
 };
 use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
-use esp_wifi::EspWifiInitFor;
+use esp_wifi::{
+    esp_now::{PeerInfo, BROADCAST_ADDRESS},
+    EspWifiInitFor,
+};
 use generic_array::GenericArray;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
@@ -71,26 +74,26 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
 
-    let usb = USB::new(
-        peripherals.USB0,
-        io.pins.gpio18,
-        io.pins.gpio19,
-        io.pins.gpio20,
-        &mut system.peripheral_clock_control,
-    );
+    // let usb = USB::new(
+    //     peripherals.USB0,
+    //     io.pins.gpio18,
+    //     io.pins.gpio19,
+    //     io.pins.gpio20,
+    //     &mut system.peripheral_clock_control,
+    // );
 
-    let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
-    let mut classes = UsbHidClassBuilder::new()
-        .add_device(WheelMouseConfig::default())
-        .add_device(BootKeyboardConfig::default())
-        .build(&usb_bus);
+    // let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
+    // let mut classes = UsbHidClassBuilder::new()
+    //     .add_device(WheelMouseConfig::default())
+    //     .add_device(BootKeyboardConfig::default())
+    //     .build(&usb_bus);
 
-    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
-        .manufacturer("shady-bastard")
-        .product("totally not a malicious thing")
-        .device_class(3)
-        .build();
-    usb_dev.poll(&mut [&mut classes]);
+    // let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
+    //     .manufacturer("shady-bastard")
+    //     .product("totally not a malicious thing")
+    //     .device_class(3)
+    //     .build();
+    // usb_dev.poll(&mut [&mut classes]);
 
     let wifi_init = esp_wifi::initialize(
         EspWifiInitFor::Wifi,
@@ -133,7 +136,8 @@ fn main() -> ! {
             io.pins.gpio6.into_push_pull_output().degrade(),
         ]),
     };
-    let mut left_thumb = KeyDriver::new(left_thumb, Delay::new(&clocks));
+    let lf_matrix_len = left_finger.bit_len();
+    // let mut left_thumb = KeyDriver::new(left_thumb, Delay::new(&clocks));
 
     // pin place-holders for now. refer to wiring diagram for correction
     // let pin_a = io.pins.gpio43.into_pull_up_input();
@@ -146,25 +150,30 @@ fn main() -> ! {
     // };
     // let mut wheel = MouseWheelDriver::new(wheel_pins);
 
-    let mut delay = Delay::new(&clocks);
-    let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
+    // let mut delay = Delay::new(&clocks);
+    // let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
+    // let secondary = PeerInfo{ peer_address: BROADCAST_ADDRESS, lmk: None, channel: None, encrypt: false };
+    // esp_now.add_peer(secondary).unwrap();
     let mut lf_state = GenericArray::default();
-    let mut lt_state = GenericArray::default();
+    // let mut lt_state = GenericArray::default();
     loop {
         // let scroll = wheel.read_scroll();
         left_finger.read_state(&mut lf_state);
-        left_thumb.read_state(&mut lt_state);
+        log::info!("{:?}", &lf_state[0..((lf_matrix_len + 7) / 8)]);
+        // left_thumb.read_state(&mut lt_state);
         // TODO: check for state from secondary...
 
         // TODO: transform the state into a kb-report
-        let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
+        // let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
         // match keyboard.write_report(kb_report) {
         //     Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
         //     Err(e) => {
         //         core::panic!("Failed to write keyboard report: {:?}", e)
         //     }
         // };
-        delay.delay_us(300u32);
-        usb_dev.poll(&mut [&mut classes]);
+        // if let Some(lf_rep) = esp_now.receive() {
+        //     log::info!("{:?}", &lf_rep.data[0..(lf_rep.len as usize)]);
+        // }
+        // usb_dev.poll(&mut [&mut classes]);
     }
 }
