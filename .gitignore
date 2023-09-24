@@ -8,3 +8,6 @@ target/
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+# Don't want to be sharing personal data...
+mac_addresses.txt
