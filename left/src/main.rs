@@ -103,7 +103,6 @@ fn main() -> ! {
             io.pins.gpio35.into_pull_up_input().degrade(),
         ]),
         outs: GenericArray::from_array([
-            io.pins.gpio44.into_push_pull_output().degrade(),
             io.pins.gpio1.into_push_pull_output().degrade(),
             io.pins.gpio2.into_push_pull_output().degrade(),
             io.pins.gpio42.into_push_pull_output().degrade(),
