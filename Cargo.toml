@@ -1,7 +1,8 @@
 [workspace]
 members = [
-    "primary",
-    "secondary",
+    "core",
+    "left",
+    "right",
     "components",
     "configs",
 ]

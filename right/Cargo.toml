@@ -1,5 +1,5 @@
 [package]
-name = "cat_esp32s3_rust_secondary"
+name = "cat_esp32s3_rust_right"
 version = "0.1.0"
 authors = ["Ben PHL <benphawke@gmail.com>"]
 edition = "2021"

@@ -6,7 +6,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
     efuse::Efuse,
-    otg_fs::{UsbBus, USB},
     peripherals::Peripherals,
     uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
     Rng, IO,
@@ -18,16 +17,8 @@ use esp_wifi::{
     EspWifiInitFor,
 };
 use generic_array::GenericArray;
-use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
-use usbd_human_interface_device::device::{
-    keyboard::{BootKeyboard, BootKeyboardConfig},
-    mouse::WheelMouseConfig,
-};
-use usbd_human_interface_device::prelude::*;
 // imports for wheel mouse. implied TODO, of course
-// use keyberon::key_code::KeyCode;
-// use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
 // use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
 
 use components::{
@@ -158,31 +149,12 @@ fn main() -> ! {
     loop {
         // let scroll = wheel.read_scroll();
         left_finger.read_state(&mut lf_state);
-        let here_msg = &lf_state[0..((lf_matrix_len + 7) / 8)];
-        if here_msg.iter().any(|b| *b != 0) {
-            log::info!("{:?}", here_msg);
-        }
-        if let Some(rf) = esp_now.receive() {
-            let msg = &rf.data[0..(rf.len as usize)];
-            if msg.iter().any(|b| *b != 0) {
-                log::info!("{:?}", msg);
-            }
-        }
-        // left_thumb.read_state(&mut lt_state);
-        // TODO: check for state from secondary...
+        let lf_msg = &lf_state[0..((lf_matrix_len + 7) / 8)];
 
-        // TODO: transform the state into a kb-report
-        // let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
-        // match keyboard.write_report(kb_report) {
-        //     Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
-        //     Err(e) => {
-        //         core::panic!("Failed to write keyboard report: {:?}", e)
-        //     }
-        // };
-        // if let Some(lf_rep) = esp_now.receive() {
-        //     log::info!("{:?}", &lf_rep.data[0..(lf_rep.len as usize)]);
-        // }
-        // usb_dev.poll(&mut [&mut classes]);
+        // left_thumb.read_state(&mut lt_state);
+        
+        let _ = esp_now.send(&BROADCAST_ADDRESS, lf_msg);
+
         delay.delay_ms(1u32);
     }
 }
