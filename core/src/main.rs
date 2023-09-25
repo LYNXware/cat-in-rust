@@ -13,10 +13,9 @@ use esp_hal::{
 };
 use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
-use esp_wifi::{
-    esp_now::{PeerInfo},
-    EspWifiInitFor,
-};
+use esp_wifi::{esp_now::PeerInfo, EspWifiInitFor};
+use generic_array::typenum::Unsigned;
+use keyberon::layout::Layout;
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::{
@@ -101,13 +100,28 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
     let esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
+    let _ = esp_now
+        .add_peer(PeerInfo {
+            peer_address: LEFT,
+            lmk: None,
+            channel: None,
+            encrypt: false,
+        })
+        .unwrap();
+    let _ = esp_now
+        .add_peer(PeerInfo {
+            peer_address: RIGHT,
+            lmk: None,
+            channel: None,
+            encrypt: false,
+        })
+        .unwrap();
 
     loop {
-
         if let Some(rf) = esp_now.receive() {
-            let msg = &rf.data[0..(rf.len as usize)];
-            if msg.iter().any(|b| *b != 0) {
-                log::info!("{:?}", msg);
+            let msg: &[u8] = &rf.data[0..(rf.len as usize)];
+            if rf.info.src_address == LEFT {
+                log::info!("{:?}", to_bool_thing::<4, 6>(msg));
             }
         }
 
@@ -125,4 +139,16 @@ fn main() -> ! {
         // usb_dev.poll(&mut [&mut classes]);
         delay.delay_ms(1u32);
     }
+}
+
+fn to_bool_thing<const PRE_W: usize, const PRE_H: usize>(bytes: &[u8]) -> [[bool; PRE_W]; PRE_H] {
+    let mut res = [[false; PRE_W]; PRE_H];
+    for idx in 0..(PRE_W * PRE_H) {
+        let row = idx / PRE_W;
+        let col = idx % PRE_W;
+        let byte = idx / 8;
+        let bit = idx % 8;
+        res[row][col] = bytes[byte] & (1 << bit) > 0;
+    }
+    res
 }
