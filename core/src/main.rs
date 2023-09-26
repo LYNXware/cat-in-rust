@@ -16,23 +16,25 @@ use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
 use esp_wifi::{esp_now::PeerInfo, EspWifiInitFor};
 use generic_array::typenum::Unsigned;
-use keyberon::layout::Layout;
+use keyberon::{layout::Layout, debounce::Debouncer, key_code::KeyCode};
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::{
     keyboard::{BootKeyboard, BootKeyboardConfig},
     mouse::WheelMouseConfig,
 };
+use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
 // imports for wheel mouse. implied TODO, of course
 // use keyberon::key_code::KeyCode;
 // use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
 
-
 mod hardware;
 
 static mut USB_MEM: [u32; 1024] = [0; 1024];
 
+static LEFT: [u8; 6] = [0x48, 0x27, 0xe2, 0x0d, 0x73, 0x70];
+static RIGHT: [u8; 6] = [0x48, 0x27, 0xe2, 0x0d, 0x6e, 0x98];
 #[entry]
 fn main() -> ! {
     init_logger(log::LevelFilter::Info);
@@ -68,26 +70,26 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
 
-    // let usb = USB::new(
-    //     peripherals.USB0,
-    //     io.pins.gpio18,
-    //     io.pins.gpio19,
-    //     io.pins.gpio20,
-    //     &mut system.peripheral_clock_control,
-    // );
+    let usb = USB::new(
+        peripherals.USB0,
+        io.pins.gpio18,
+        io.pins.gpio19,
+        io.pins.gpio20,
+        &mut system.peripheral_clock_control,
+    );
 
-    // let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
-    // let mut classes = UsbHidClassBuilder::new()
-    //     .add_device(WheelMouseConfig::default())
-    //     .add_device(BootKeyboardConfig::default())
-    //     .build(&usb_bus);
+    let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
+    let mut classes = UsbHidClassBuilder::new()
+        .add_device(WheelMouseConfig::default())
+        .add_device(BootKeyboardConfig::default())
+        .build(&usb_bus);
 
-    // let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
-    //     .manufacturer("shady-bastard")
-    //     .product("totally not a malicious thing")
-    //     .device_class(3)
-    //     .build();
-    // usb_dev.poll(&mut [&mut classes]);
+    let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
+        .manufacturer("shady-bastard")
+        .product("totally not a malicious thing")
+        .device_class(3)
+        .build();
+    usb_dev.poll(&mut [&mut classes]);
 
     let wifi_init = esp_wifi::initialize(
         EspWifiInitFor::Wifi,
@@ -117,15 +119,33 @@ fn main() -> ! {
             encrypt: false,
         })
         .unwrap();
+    let mut left_layout = Layout::new(&configs::left_finger::LAYERS);
+
+    let mut db = Debouncer::new([[false; 6];4], [[false; 6];4], 1);
 
     loop {
+        left_layout.tick();
         if let Some(rf) = esp_now.receive() {
             let msg: &[u8] = &rf.data[0..(rf.len as usize)];
             if rf.info.src_address == LEFT {
-                log::info!("{:?}", to_bool_thing::<4, 6>(msg));
+                let rep = to_bool_thing(msg);
+                let events = db.events(rep, None);
+                for ev in events {
+                    left_layout.event(ev);
+                }
+                let ron_report = left_layout.keycodes();
+
+                let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
+                let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
+                match keyboard.write_report(hid_report) {
+                    Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
+                    Err(e) => {
+                        core::panic!("Failed to write keyboard report: {:?}", e)
+                    }
+                };
+                usb_dev.poll(&mut [&mut classes]);
             }
         }
-
         // TODO: fuse all the data and write the usb reports
         // TODO: recieve reconfiguration instructions
 
@@ -137,8 +157,7 @@ fn main() -> ! {
         //         core::panic!("Failed to write keyboard report: {:?}", e)
         //     }
         // };
-        // usb_dev.poll(&mut [&mut classes]);
-        delay.delay_ms(1u32);
+        delay.delay_us(300u32);
     }
 }
 
@@ -149,7 +168,7 @@ fn to_bool_thing<const PRE_W: usize, const PRE_H: usize>(bytes: &[u8]) -> [[bool
         let col = idx % PRE_W;
         let byte = idx / 8;
         let bit = idx % 8;
-        res[col][PRE_H - row - 1] = bytes[byte] & (1 << bit) > 0;
+        res[PRE_W - col - 1][PRE_H - row - 1] = bytes[byte] & (1 << bit) > 0;
     }
     res
 }
