@@ -2,6 +2,7 @@
 #![no_std]
 #![no_main]
 
+use bitvec::{order::Lsb0, slice::BitSlice};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -141,14 +142,14 @@ fn main() -> ! {
     }
 }
 
-fn to_bool_thing<const PRE_W: usize, const PRE_H: usize>(bytes: &[u8]) -> [[bool; PRE_W]; PRE_H] {
-    let mut res = [[false; PRE_W]; PRE_H];
+fn to_bool_thing<const PRE_W: usize, const PRE_H: usize>(bytes: &[u8]) -> [[bool; PRE_H]; PRE_W] {
+    let mut res = [[false; PRE_H]; PRE_W];
     for idx in 0..(PRE_W * PRE_H) {
         let row = idx / PRE_W;
         let col = idx % PRE_W;
         let byte = idx / 8;
         let bit = idx % 8;
-        res[row][col] = bytes[byte] & (1 << bit) > 0;
+        res[col][PRE_H - row - 1] = bytes[byte] & (1 << bit) > 0;
     }
     res
 }
