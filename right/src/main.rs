@@ -92,12 +92,12 @@ fn main() -> ! {
         ]),
         outs: GenericArray::from_array([
             // io.pins.gpio44.into_push_pull_output().degrade(),
-            io.pins.gpio1.into_push_pull_output().degrade(),
-            io.pins.gpio2.into_push_pull_output().degrade(),
-            io.pins.gpio42.into_push_pull_output().degrade(),
-            io.pins.gpio41.into_push_pull_output().degrade(),
-            io.pins.gpio40.into_push_pull_output().degrade(),
             io.pins.gpio39.into_push_pull_output().degrade(),
+            io.pins.gpio40.into_push_pull_output().degrade(),
+            io.pins.gpio41.into_push_pull_output().degrade(),
+            io.pins.gpio42.into_push_pull_output().degrade(),
+            io.pins.gpio2.into_push_pull_output().degrade(),
+            io.pins.gpio1.into_push_pull_output().degrade(),
         ]),
     };
 
@@ -118,25 +118,29 @@ fn main() -> ! {
     // };
     // let mut right_thumb = KeyDriver::new(right_thumb, Delay::new(&clocks));
 
-    // pin place-holders for now. refer to wiring diagram for correction
-    // let pin_a = io.pins.gpio45.into_pull_up_input();
-    // let pin_b = io.pins.gpio48.into_pull_up_input();
-    // let gnd = io.pins.gpio0.into_push_pull_output();
-    // let wheel_pins = UninitWheelPins {
-    //     in1: pin_a,
-    //     in2: pin_b,
-    //     gnd: Some(gnd),
-    // };
-    // let mut wheel = MouseWheelDriver::new(wheel_pins);
+    let pin_a = io.pins.gpio45.into_pull_up_input();
+    let pin_b = io.pins.gpio48.into_pull_up_input();
+    let wheel_gnd = io.pins.gpio0.into_push_pull_output();
+    let wheel_pins = UninitWheelPins {
+        in1: pin_a,
+        in2: pin_b,
+        gnd: Some(wheel_gnd),
+    };
+    let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut delay = Delay::new(&clocks);
     let mut rf_state = GenericArray::default();
     // let mut rt_state = GenericArray::default();
     loop {
-        // let scroll = wheel.read_scroll();
         right_finger.read_state(&mut rf_state);
         // right_thumb.read_state(&mut rt_state);
 
+        match wheel.read_scroll() {
+            Some(KeyCode::MediaScrollDown) => rf_state[0] |= 1 << 3,
+            Some(KeyCode::MediaScrollUp) => rf_state[0] |= (1 << 7),
+            None => {},
+            _ => panic!("this shouldn't happen"),
+        };
         let _ = esp_now
             .send(
                 &BROADCAST_ADDRESS,
@@ -144,13 +148,6 @@ fn main() -> ! {
             )
             .unwrap();
         // todo: drain pointer movement into esp-now
-        // if let Some(scroll) = scroll {
-        //     let scroll = match scroll {
-        //         KeyCode::MediaScrollDown => 1,
-        //         KeyCode::MediaScrollUp => -1,
-        //         _ => panic!("this shouldn't happen"),
-        //     };
-        // }
         delay.delay_us(1000u32);
     }
 }

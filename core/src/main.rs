@@ -2,6 +2,7 @@
 #![no_std]
 #![no_main]
 
+use arrayvec::ArrayVec;
 use bitvec::{order::Lsb0, slice::BitSlice};
 use esp_backtrace as _;
 use esp_hal::{
@@ -20,7 +21,7 @@ use keyberon::{layout::Layout, debounce::Debouncer, key_code::KeyCode};
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::{
-    keyboard::{BootKeyboard, BootKeyboardConfig},
+    keyboard::{BootKeyboard, BootKeyboardConfig, BootKeyboardReport},
     mouse::WheelMouseConfig,
 };
 use usbd_human_interface_device::page::Keyboard as HidKeyboard;
@@ -120,31 +121,59 @@ fn main() -> ! {
         })
         .unwrap();
     let mut left_layout = Layout::new(&configs::left_finger::LAYERS);
+    let mut right_layout = Layout::new(&configs::right_finger::LAYERS);
 
-    let mut db = Debouncer::new([[false; 6];4], [[false; 6];4], 1);
+    let mut r_db = Debouncer::new([[false; 6];4], [[false; 6];4], 0);
+    let mut l_db = Debouncer::new([[false; 6];4], [[false; 6];4], 0);
 
+    let mut cached_downs = ArrayVec::<_, 20>::new();
     loop {
         left_layout.tick();
+        right_layout.tick();
+        // let mut evs = ArrayVec::<_, 20>::new();
         if let Some(rf) = esp_now.receive() {
             let msg: &[u8] = &rf.data[0..(rf.len as usize)];
             if rf.info.src_address == LEFT {
-                let rep = to_bool_thing(msg);
-                let events = db.events(rep, None);
-                for ev in events {
+                let rep = to_bool_thing::<4, 6>(msg);
+                let events = l_db.events(rep, None);
+                let arr = events.collect::<ArrayVec<_, 20>>();
+                if arr.len() > 0 {
+                    // log::info!("left: {:?}", arr);
+                }
+                for ev in arr.into_iter() {
                     left_layout.event(ev);
                 }
-                let ron_report = left_layout.keycodes();
 
-                let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
-                let hid_report = ron_report.map(|k: KeyCode| k as u8).map(HidKeyboard::from);
-                match keyboard.write_report(hid_report) {
-                    Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
-                    Err(e) => {
-                        core::panic!("Failed to write keyboard report: {:?}", e)
-                    }
-                };
-                usb_dev.poll(&mut [&mut classes]);
+            } else if rf.info.src_address == RIGHT {
+                let rep = to_bool_thing::<4, 6>(msg);
+                let events = r_db.events(rep, None);
+                let arr = events.collect::<ArrayVec<_, 20>>();
+                if arr.len() > 0 {
+                    // log::info!("right: {:?}", arr);
+                }
+
+                for ev in arr.into_iter() {
+                    right_layout.event(ev);
+                }
             }
+
+            let evs = left_layout.keycodes().chain(right_layout.keycodes()).filter(|kc| *kc != KeyCode::No);
+            let evs = evs.take(20).collect::<ArrayVec::<_, 20>>();
+            if evs != cached_downs  {
+                if evs.contains(&KeyCode::MediaScrollUp) {
+                    log::info!("{:?}", KeyCode::MediaScrollUp);
+                }
+                cached_downs = evs;
+                log::info!("{:?}", cached_downs);
+            }
+            // let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
+            // match keyboard.write_report(hid_report) {
+            //     Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
+            //     Err(e) => {
+            //         core::panic!("Failed to write keyboard report: {:?}", e)
+            //     }
+            // };
+            usb_dev.poll(&mut [&mut classes]);
         }
         // TODO: fuse all the data and write the usb reports
         // TODO: recieve reconfiguration instructions
