@@ -11,7 +11,7 @@ configs = {path = "../configs/"}
 esp_hal = { package = "esp32s3-hal", version = "0.12.0" }
 esp-backtrace = { version = "0.7.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-println = { version = "0.5.0", features = ["esp32s3", "log"] }
-esp-wifi = {git = "https://github.com/esp-rs/esp-wifi.git", rev = "b54310ece09141d116c94f64ff8559810c64b6be", features = ["esp32s3", "wifi", "esp-now", "phy-enable-usb"]}
+esp-wifi = {git = "https://github.com/esp-rs/esp-wifi.git", rev = "b54310ece09141d116c94f64ff8559810c64b6be", features = ["esp32s3",  "esp-now", "phy-enable-usb"]}
 keyberon = {git = "https://github.com/Ben-PH/keyberon"}
 transpose = {git = "https://github.com/Ben-PH/transpose"}
 critical-section = "1.1.1"
