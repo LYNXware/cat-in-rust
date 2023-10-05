@@ -13,7 +13,7 @@ use esp_hal::{
 use esp_hal::{prelude::*, Delay, Rng};
 use esp_println::logger::init_logger;
 use esp_wifi::{
-    esp_now::{PeerInfo, BROADCAST_ADDRESS},
+    esp_now::BROADCAST_ADDRESS,
     EspWifiInitFor,
 };
 
@@ -35,7 +35,7 @@ mod hardware;
  *  - one idea: write a tool that gets the MAC address of the primary/others, and generates a
  *  config file (tson, toml, json, etc.) which a build.rs can use to compile-time define things
 */
-static PRIMARY_ADDR: [u8; 6] = BROADCAST_ADDRESS;
+static _PRIMARY_ADDR: [u8; 6] = BROADCAST_ADDRESS;
 
 #[entry]
 fn main() -> ! {
@@ -137,7 +137,7 @@ fn main() -> ! {
 
         match wheel.read_scroll() {
             Some(KeyCode::MediaScrollDown) => rf_state[0] |= 1 << 3,
-            Some(KeyCode::MediaScrollUp) => rf_state[0] |= (1 << 7),
+            Some(KeyCode::MediaScrollUp) => rf_state[0] |= 1 << 7,
             None => {},
             _ => panic!("this shouldn't happen"),
         };

@@ -1,5 +1,5 @@
 use crate::ReadState;
-use bitvec::{view::BitView, order::Lsb0, slice::BitSlice};
+use bitvec::{order::Lsb0, slice::BitSlice};
 use core::ops::{Add, Div, Mul};
 use hal::{
     blocking::delay::DelayUs,
@@ -80,7 +80,7 @@ where
     // TODO: this is currently bit_len, but it bytes, not bits :(
     type LEN = <<<InN as Mul<OutN>>::Output as Add<U7>>::Output as Div<U8>>::Output;
     fn read_state(&mut self, buf: &mut GenericArray<u8, Self::LEN>) {
-        self.matrix.read_state(buf, &mut self.delayer)
+        self.matrix.read_state(buf, &mut self.delayer);
     }
 }
 

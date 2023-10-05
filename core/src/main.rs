@@ -3,7 +3,6 @@
 #![no_main]
 
 use arrayvec::ArrayVec;
-use bitvec::{order::Lsb0, slice::BitSlice};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
@@ -16,13 +15,12 @@ use esp_hal::{
 use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
 use esp_wifi::{esp_now::PeerInfo, EspWifiInitFor};
-use generic_array::typenum::Unsigned;
-use keyberon::{layout::Layout, debounce::Debouncer, key_code::KeyCode};
+use keyberon::{debounce::Debouncer, key_code::KeyCode, layout::Layout};
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
 use usbd_human_interface_device::device::{
-    keyboard::{BootKeyboard, BootKeyboardConfig, BootKeyboardReport},
-    mouse::WheelMouseConfig,
+    keyboard::{BootKeyboard, BootKeyboardConfig},
+    // mouse::{WheelMouseConfig, WheelMouse, WheelMouseReport},
 };
 use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
@@ -34,6 +32,7 @@ mod hardware;
 
 static mut USB_MEM: [u32; 1024] = [0; 1024];
 
+// TODO: have this handled with Non-Vol-Storage
 static LEFT: [u8; 6] = [0x48, 0x27, 0xe2, 0x0d, 0x73, 0x70];
 static RIGHT: [u8; 6] = [0x48, 0x27, 0xe2, 0x0d, 0x6e, 0x98];
 #[entry]
@@ -81,7 +80,7 @@ fn main() -> ! {
 
     let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
     let mut classes = UsbHidClassBuilder::new()
-        .add_device(WheelMouseConfig::default())
+        //.add_device(WheelMouseConfig::default())
         .add_device(BootKeyboardConfig::default())
         .build(&usb_bus);
 
@@ -104,7 +103,7 @@ fn main() -> ! {
 
     let mut delay = Delay::new(&clocks);
     let esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
-    let _ = esp_now
+    esp_now
         .add_peer(PeerInfo {
             peer_address: LEFT,
             lmk: None,
@@ -112,7 +111,7 @@ fn main() -> ! {
             encrypt: false,
         })
         .unwrap();
-    let _ = esp_now
+    esp_now
         .add_peer(PeerInfo {
             peer_address: RIGHT,
             lmk: None,
@@ -123,8 +122,8 @@ fn main() -> ! {
     let mut left_layout = Layout::new(&configs::left_finger::LAYERS);
     let mut right_layout = Layout::new(&configs::right_finger::LAYERS);
 
-    let mut r_db = Debouncer::new([[false; 6];4], [[false; 6];4], 0);
-    let mut l_db = Debouncer::new([[false; 6];4], [[false; 6];4], 0);
+    let mut r_db = Debouncer::new([[false; 6]; 4], [[false; 6]; 4], 0);
+    let mut l_db = Debouncer::new([[false; 6]; 4], [[false; 6]; 4], 0);
 
     let mut cached_downs = ArrayVec::<_, 20>::new();
     loop {
@@ -137,42 +136,52 @@ fn main() -> ! {
                 let rep = to_bool_thing::<4, 6>(msg);
                 let events = l_db.events(rep, None);
                 let arr = events.collect::<ArrayVec<_, 20>>();
-                if arr.len() > 0 {
-                    // log::info!("left: {:?}", arr);
-                }
-                for ev in arr.into_iter() {
+                for ev in arr {
                     left_layout.event(ev);
                 }
-
             } else if rf.info.src_address == RIGHT {
                 let rep = to_bool_thing::<4, 6>(msg);
                 let events = r_db.events(rep, None);
                 let arr = events.collect::<ArrayVec<_, 20>>();
-                if arr.len() > 0 {
-                    // log::info!("right: {:?}", arr);
-                }
-
-                for ev in arr.into_iter() {
+                for ev in arr {
                     right_layout.event(ev);
                 }
             }
 
-            let evs = left_layout.keycodes().chain(right_layout.keycodes()).filter(|kc| *kc != KeyCode::No);
-            let evs = evs.take(20).collect::<ArrayVec::<_, 20>>();
-            if evs != cached_downs  {
-                if evs.contains(&KeyCode::MediaScrollUp) {
-                    log::info!("{:?}", KeyCode::MediaScrollUp);
-                }
-                cached_downs = evs;
-                log::info!("{:?}", cached_downs);
+            let (_wheel_evs, key_evs): (ArrayVec<_, 20>, ArrayVec<_, 20>) = left_layout
+                .keycodes()
+                .chain(right_layout.keycodes())
+                .filter(|kc| *kc != KeyCode::No)
+                .partition(|kc| matches! (*kc,  KeyCode::MediaScrollDown | KeyCode::MediaScrollUp));
+
+            if key_evs != cached_downs {
+                cached_downs = key_evs.iter().copied().collect::<ArrayVec<_, 20>>();
+
+                let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
+                match keyboard.write_report(key_evs.iter().map(|kc| HidKeyboard::from(*kc as u8))) {
+                    Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
+                    Err(e) => {
+                        core::panic!("Failed to write keyboard report: {:?}", e)
+                    }
+                };
             }
-            // let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
-            // match keyboard.write_report(hid_report) {
-            //     Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
-            //     Err(e) => {
-            //         core::panic!("Failed to write keyboard report: {:?}", e)
+            // TODO: fix the scroll-wheel issue
+            // let scroll = if wheel_evs.len() == 1 {
+            //     if wheel_evs.get(0) == Some(&KeyCode::MediaScrollUp) {
+            //         Some(1)
+            //     } else if wheel_evs.first() == Some(&KeyCode::MediaScrollDown) {
+            //         Some(-1)
+            //     } else {
+            //         None
             //     }
+            // } else {
+            //     None
             // };
+            // if let Some(scroll_val) = scroll {
+            //     let mouse = classes.device::<WheelMouse<_>, _>();
+            //     mouse.write_report(&WheelMouseReport{x:0,y:0, buttons: 0, vertical_wheel: scroll_val, horizontal_wheel: 0 });
+            // }
+            // let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
             usb_dev.poll(&mut [&mut classes]);
         }
         // TODO: fuse all the data and write the usb reports

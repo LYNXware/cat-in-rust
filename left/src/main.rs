@@ -13,7 +13,7 @@ use esp_hal::{
 use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
 use esp_wifi::{
-    esp_now::{PeerInfo, BROADCAST_ADDRESS},
+    esp_now::BROADCAST_ADDRESS,
     EspWifiInitFor,
 };
 use generic_array::GenericArray;
@@ -27,8 +27,6 @@ use components::{
 };
 
 mod hardware;
-
-static mut USB_MEM: [u32; 1024] = [0; 1024];
 
 #[entry]
 fn main() -> ! {
@@ -65,26 +63,6 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
 
-    // let usb = USB::new(
-    //     peripherals.USB0,
-    //     io.pins.gpio18,
-    //     io.pins.gpio19,
-    //     io.pins.gpio20,
-    //     &mut system.peripheral_clock_control,
-    // );
-
-    // let usb_bus = UsbBus::new(usb, unsafe { &mut USB_MEM });
-    // let mut classes = UsbHidClassBuilder::new()
-    //     .add_device(WheelMouseConfig::default())
-    //     .add_device(BootKeyboardConfig::default())
-    //     .build(&usb_bus);
-
-    // let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0, 0))
-    //     .manufacturer("shady-bastard")
-    //     .product("totally not a malicious thing")
-    //     .device_class(3)
-    //     .build();
-    // usb_dev.poll(&mut [&mut classes]);
 
     let wifi_init = esp_wifi::initialize(
         EspWifiInitFor::Wifi,
@@ -113,7 +91,7 @@ fn main() -> ! {
     };
 
     let mut left_finger = KeyDriver::new(left_finger, Delay::new(&clocks));
-    let left_thumb = UninitKeyPins {
+    let _left_thumb = UninitKeyPins {
         ins: GenericArray::from_array([
             io.pins.gpio17.into_pull_up_input().degrade(),
             io.pins.gpio16.into_pull_up_input().degrade(),
@@ -127,18 +105,7 @@ fn main() -> ! {
         ]),
     };
     let lf_matrix_len = left_finger.bit_len();
-    // let mut left_thumb = KeyDriver::new(left_thumb, Delay::new(&clocks));
 
-    // pin place-holders for now. refer to wiring diagram for correction
-    // let pin_a = io.pins.gpio43.into_pull_up_input();
-    // let pin_b = io.pins.gpio45.into_pull_up_input();
-    // let gnd = io.pins.gpio0.into_push_pull_output();
-    // let wheel_pins = UninitWheelPins {
-    //     in1: pin_a,
-    //     in2: pin_b,
-    //     gnd: Some(gnd),
-    // };
-    // let mut wheel = MouseWheelDriver::new(wheel_pins);
 
     let mut delay = Delay::new(&clocks);
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
@@ -146,12 +113,11 @@ fn main() -> ! {
     let mut lf_state = GenericArray::default();
     // let mut lt_state = GenericArray::default();
     loop {
-        // let scroll = wheel.read_scroll();
         left_finger.read_state(&mut lf_state);
         let lf_msg = &lf_state[0..((lf_matrix_len + 7) / 8)];
 
         // left_thumb.read_state(&mut lt_state);
-        
+
         let _ = esp_now.send(&BROADCAST_ADDRESS, lf_msg);
 
         delay.delay_ms(1u32);
