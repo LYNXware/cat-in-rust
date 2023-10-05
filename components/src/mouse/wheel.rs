@@ -92,9 +92,7 @@ impl<
 {
     fn read_scroll(&mut self) -> Option<KeyCode> {
         self.state = self.pins.in1.is_high().unwrap();
-        let res = if self.state == self.prev_state {
-            None
-        } else {
+        let res = if self.state != self.prev_state {
             let scroll = if self.pins.in2.is_high().unwrap() == self.state {
                 self.value -= 1;
                 self.scroll_val = -1;
@@ -105,6 +103,8 @@ impl<
                 KeyCode::MediaScrollUp
             };
             Some(scroll)
+        } else {
+            None
         };
         self.prev_state = self.state;
         res
