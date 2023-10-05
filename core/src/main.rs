@@ -18,15 +18,9 @@ use esp_wifi::{esp_now::PeerInfo, EspWifiInitFor};
 use keyberon::{debounce::Debouncer, key_code::KeyCode, layout::Layout};
 use usb_device::prelude::{UsbDeviceBuilder, UsbVidPid};
 
-use usbd_human_interface_device::device::{
-    keyboard::{BootKeyboard, BootKeyboardConfig},
-    // mouse::{WheelMouseConfig, WheelMouse, WheelMouseReport},
-};
+use usbd_human_interface_device::device::keyboard::{BootKeyboard, BootKeyboardConfig};
 use usbd_human_interface_device::page::Keyboard as HidKeyboard;
 use usbd_human_interface_device::prelude::*;
-// imports for wheel mouse. implied TODO, of course
-// use keyberon::key_code::KeyCode;
-// use usbd_human_interface_device::device::mouse::{WheelMouseReport, WheelMouse};
 
 mod hardware;
 
@@ -62,6 +56,7 @@ fn main() -> ! {
     gnd.set_low().unwrap();
 
     // will log in the background. Don't need to use directly
+    // TODO: put this behind a uart feature-gate
     let mut _uart = Uart::new_with_config(
         peripherals.UART0,
         Some(UartConfig::default()),
@@ -152,7 +147,7 @@ fn main() -> ! {
                 .keycodes()
                 .chain(right_layout.keycodes())
                 .filter(|kc| *kc != KeyCode::No)
-                .partition(|kc| matches! (*kc,  KeyCode::MediaScrollDown | KeyCode::MediaScrollUp));
+                .partition(|kc| matches!(*kc, KeyCode::MediaScrollDown | KeyCode::MediaScrollUp));
 
             if key_evs != cached_downs {
                 cached_downs = key_evs.iter().copied().collect::<ArrayVec<_, 20>>();
@@ -184,17 +179,8 @@ fn main() -> ! {
             // let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
             usb_dev.poll(&mut [&mut classes]);
         }
-        // TODO: fuse all the data and write the usb reports
         // TODO: recieve reconfiguration instructions
 
-        // TODO: transform the state into a kb-report
-        // let keyboard = classes.device::<BootKeyboard<'_, _>, _>();
-        // match keyboard.write_report(kb_report) {
-        //     Err(UsbHidError::WouldBlock | UsbHidError::Duplicate) | Ok(_) => {}
-        //     Err(e) => {
-        //         core::panic!("Failed to write keyboard report: {:?}", e)
-        //     }
-        // };
         delay.delay_us(300u32);
     }
 }

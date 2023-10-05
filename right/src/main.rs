@@ -3,19 +3,10 @@
 #![no_main]
 
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    efuse::Efuse,
-    peripherals::Peripherals,
-    uart::{config::Config as UartConfig, TxRxPins as UartTxRx, Uart},
-    IO,
-};
+use esp_hal::{clock::ClockControl, efuse::Efuse, peripherals::Peripherals, IO};
 use esp_hal::{prelude::*, Delay, Rng};
 use esp_println::logger::init_logger;
-use esp_wifi::{
-    esp_now::BROADCAST_ADDRESS,
-    EspWifiInitFor,
-};
+use esp_wifi::{esp_now::BROADCAST_ADDRESS, EspWifiInitFor};
 
 // imports for wheel mouse. implied TODO, of course
 use components::{
@@ -29,12 +20,7 @@ use components::matrix::{KeyDriver, UninitKeyPins};
 
 mod hardware;
 
-/* TODO: setup some sort of configuration-based hard-coding to set the primary.
- *  - needs to be statically defined. Zero-runtime
- *  - defined in such a way that works well with a git-repo
- *  - one idea: write a tool that gets the MAC address of the primary/others, and generates a
- *  config file (tson, toml, json, etc.) which a build.rs can use to compile-time define things
-*/
+// TODO: Use NVS to store peer info.
 static _PRIMARY_ADDR: [u8; 6] = BROADCAST_ADDRESS;
 
 #[entry]
@@ -64,24 +50,6 @@ fn main() -> ! {
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
 
     let io = IO::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    // uart setup
-    let uart_vdd_pin = io.pins.gpio11;
-    let mut uart_vdd_pin = uart_vdd_pin.into_push_pull_output();
-    uart_vdd_pin.set_high().unwrap();
-
-    let t_r_pins = UartTxRx::new_tx_rx(io.pins.gpio12, io.pins.gpio13);
-    let mut gnd = io.pins.gpio14.into_push_pull_output();
-    gnd.set_low().unwrap();
-
-    // will log in the background. Don't need to use directly
-    let mut _uart = Uart::new_with_config(
-        peripherals.UART0,
-        Some(UartConfig::default()),
-        Some(t_r_pins),
-        &clocks,
-        &mut system.peripheral_clock_control,
-    );
 
     let right_finger = UninitKeyPins {
         ins: GenericArray::from_array([
@@ -138,7 +106,7 @@ fn main() -> ! {
         match wheel.read_scroll() {
             Some(KeyCode::MediaScrollDown) => rf_state[0] |= 1 << 3,
             Some(KeyCode::MediaScrollUp) => rf_state[0] |= 1 << 7,
-            None => {},
+            None => {}
             _ => panic!("this shouldn't happen"),
         };
         let _ = esp_now
@@ -147,7 +115,6 @@ fn main() -> ! {
                 &rf_state.as_slice()[0..((rf_matrix_len + 7) / 8)],
             )
             .unwrap();
-        // todo: drain pointer movement into esp-now
         delay.delay_us(1000u32);
     }
 }

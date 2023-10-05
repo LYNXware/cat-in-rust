@@ -12,14 +12,8 @@ use esp_hal::{
 };
 use esp_hal::{prelude::*, Delay};
 use esp_println::logger::init_logger;
-use esp_wifi::{
-    esp_now::BROADCAST_ADDRESS,
-    EspWifiInitFor,
-};
+use esp_wifi::{esp_now::BROADCAST_ADDRESS, EspWifiInitFor};
 use generic_array::GenericArray;
-
-// imports for wheel mouse. implied TODO, of course
-// use components::mouse::{MouseWheelDriver, Scroller, UninitWheelPins};
 
 use components::{
     matrix::{KeyDriver, UninitKeyPins},
@@ -63,7 +57,6 @@ fn main() -> ! {
         &mut system.peripheral_clock_control,
     );
 
-
     let wifi_init = esp_wifi::initialize(
         EspWifiInitFor::Wifi,
         timer,
@@ -105,7 +98,6 @@ fn main() -> ! {
         ]),
     };
     let lf_matrix_len = left_finger.bit_len();
-
 
     let mut delay = Delay::new(&clocks);
     let mut esp_now = esp_wifi::esp_now::EspNow::new(&wifi_init, wifi).unwrap();
